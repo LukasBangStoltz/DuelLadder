@@ -4,6 +4,8 @@
 ## Version: 0.4.0
 ## SavedVariables: DuelLadderDB
 ## IconTexture: Interface\Icons\Ability_DualWield
+## X-Curse-Project-ID: 1741904
+## X-License: MIT
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml

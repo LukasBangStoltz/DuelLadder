@@ -77,6 +77,7 @@ Everyone in the guild should run the same version: sync formats change between v
 | `Commands.lua`, `Minimap.lua` | Slash commands and the minimap button |
 | `Libs/` | LibStub, CallbackHandler, LibDataBroker, LibDBIcon |
 | `tests/` | Out-of-game test harness (not loaded by WoW) |
+| `media/` | Project logo (not part of the addon) |
 
 ## Tests
 
@@ -114,7 +115,11 @@ Releases are built by the [BigWigs packager](https://github.com/BigWigsMods/pack
 3. GitHub runs the tests, checks the tag matches the `.toc` version, builds the zip
    (without `tests/`, see `.pkgmeta`) and publishes the GitHub Release.
 
-**CurseForge:** add `## X-Curse-Project-ID: <id>` to `DuelLadder.toc` and a repository
-secret `CF_API_TOKEN` (an API token from https://authors.curseforge.com/account/api-tokens).
-From then on every release is uploaded to CurseForge too. `## Interface: 20506` is
-published as TBC Classic (Anniversary).
+**CurseForge:** the project ID is in `DuelLadder.toc` (`## X-Curse-Project-ID`), and the
+upload token is the repository secret `CF_API_TOKEN` (created under Author Settings → API
+Tokens on authors.curseforge.com). Every release is uploaded to CurseForge too.
+`## Interface: 20506` is published as TBC Classic (Anniversary).
+
+## License
+
+MIT - see [LICENSE](LICENSE). The bundled libraries in `Libs/` keep their own licenses.
