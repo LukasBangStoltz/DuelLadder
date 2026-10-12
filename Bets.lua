@@ -231,7 +231,7 @@ local function CheckAmount(copper)
         return nil, ("Bets must be between %s and %s."):format(Compat.MoneyText(Bets.MIN_COPPER), Compat.MoneyText(Bets.MAX_COPPER))
     end
     if not Compat.CanAfford(copper) then
-        ns.Print("Heads up: you don't have " .. Compat.MoneyText(copper) .. " right now.")
+        return nil, ("You only have %s, so you can't bet %s."):format(Compat.MoneyText(GetMoney()), Compat.MoneyText(copper))
     end
     return copper
 end
@@ -297,7 +297,7 @@ function Bets:Accept(id)
     local theirs = pool.stakes[Bets.Challenger(pool)]
     if not theirs or theirs.cancel then return nil, "They cancelled that challenge." end
     if not Compat.CanAfford(theirs.amt) then
-        ns.Print("Heads up: you don't have " .. Compat.MoneyText(theirs.amt) .. " right now.")
+        return nil, ("You only have %s, so you can't match %s."):format(Compat.MoneyText(GetMoney()), Compat.MoneyText(theirs.amt))
     end
     pool.stakes[me] = { side = me, amt = theirs.amt, t = Compat.Now() }
     Changed(id)
