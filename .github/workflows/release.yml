@@ -53,7 +53,14 @@ jobs:
           git tag "v$version"
           git push origin "v$version"
           echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - name: Package and publish
         if: steps.version.outputs.publish == 'true'
         uses: BigWigsMods/packager@v2
+        env:
+          # On a branch push the packager sees the tag we just made on HEAD and skips ("Found future
+          # tag"), expecting a separate tag-push run. Tags pushed with GITHUB_TOKEN never trigger one,
+          # so present this run as the tag run instead.
+          GITHUB_REF: refs/tags/${{ steps.version.outputs.tag }}
+          GITHUB_REF_NAME: ${{ steps.version.outputs.tag }}
