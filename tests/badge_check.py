@@ -28,4 +28,11 @@ db = logout("Anna")
 a = login("Anna", "WARRIOR", 70, db)
 pump(15)
 check(a.badge("Anna", "fb") == 1 and a.badge("Anna", "s5") == 1, "relogging doesn't award catch-up badges twice")
+
+# Ratings survive a relog
+rating = a.stat("Anna", "rating")
+db = logout("Anna")
+a = login("Anna", "WARRIOR", 70, db)
+pump(15)
+check(a.stat("Anna", "rating") == rating, "relogging doesn't change Anna's rating")
 print(f"\n{failures} failure(s)")
