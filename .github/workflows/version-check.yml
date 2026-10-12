@@ -1,0 +1,37 @@
+# Fails a pull request that changes the addon itself (.lua, .xml, .toc outside tests/) without
+# bumping "## Version:" in DuelLadder.toc. Without a bump, release.yml publishes nothing on merge.
+# Docs, test and workflow changes don't need a bump.
+name: Version bump
+
+on:
+  pull_request:
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Require a version bump for addon changes
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          changed=$(git diff --name-only "$BASE"...HEAD | grep -E '\.(lua|xml|toc)$' | grep -v '^tests/' || true)
+          if [ -z "$changed" ]; then
+            echo "No addon files changed, so no version bump is needed."
+            exit 0
+          fi
+
+          read_version() { sed -n 's/^## Version: *//p' | tr -d '\r'; }
+          old=$(git show "$BASE:DuelLadder.toc" | read_version)
+          new=$(read_version < DuelLadder.toc)
+
+          if [ "$old" = "$new" ]; then
+            echo "::error file=DuelLadder.toc::Addon files changed but '## Version:' is still $old. Bump it, or nothing will be released when this merges."
+            echo "Changed addon files:"
+            echo "$changed"
+            exit 1
+          fi
+          echo "Version bumped: $old -> $new"
