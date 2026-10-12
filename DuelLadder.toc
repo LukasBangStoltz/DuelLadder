@@ -1,0 +1,30 @@
+## Interface: 20506
+## Title: DuelLadder
+## Notes: Guild duel ladder - ratings, titles, King of the Hill, badges, head-to-head records and gold bets for every character in your guild.
+## Version: 0.4.0
+## SavedVariables: DuelLadderDB
+## IconTexture: Interface\Icons\Ability_DualWield
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\lib.xml
+
+Compat.lua
+Core.lua
+Data.lua
+Badges.lua
+Bets.lua
+Sync.lua
+Duel.lua
+
+UI\Frame.lua
+UI\Ladder.lua
+UI\Members.lua
+UI\Matchups.lua
+UI\History.lua
+UI\Bets.lua
+UI\Badges.lua
+
+Commands.lua
+Minimap.lua

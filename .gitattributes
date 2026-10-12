@@ -1,0 +1,8 @@
+# Normalize line endings in the repo; WoW reads both LF and CRLF.
+* text=auto
+
+*.lua text
+*.toc text
+*.xml text
+*.py text
+*.md text

@@ -1,0 +1,19 @@
+# Release zips (attach them to GitHub Releases instead)
+*.zip
+
+# Python (test harness)
+__pycache__/
+*.pyc
+.venv/
+venv/
+tests/out_*.txt
+tests/run.txt
+
+# Editors and OS clutter
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
