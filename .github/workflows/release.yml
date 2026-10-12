@@ -1,18 +1,23 @@
-# Publishes a release when a version tag is pushed, e.g.:
-#   git tag v0.4.1
-#   git push origin v0.4.1
+# Publishes a release whenever something is merged into main (main only accepts pull requests).
 #
 # 1. Runs the tests.
-# 2. Checks the tag matches "## Version:" in DuelLadder.toc (tag v0.4.1 <-> Version 0.4.1).
-# 3. The BigWigs packager builds DuelLadder-<tag>.zip (without tests/, see .pkgmeta) and
-#    creates the GitHub Release. If the CF_API_TOKEN secret is set and DuelLadder.toc has
-#    "## X-Curse-Project-ID:", it uploads to CurseForge too; otherwise that step is skipped.
+# 2. Reads "## Version:" from DuelLadder.toc. If tag v<version> already exists, nothing is
+#    published (merges that don't bump the version, e.g. docs or test changes, are skipped).
+# 3. Otherwise creates the tag v<version> on the merged commit, and the BigWigs packager builds
+#    DuelLadder-<tag>.zip (without tests/, see .pkgmeta) and creates the GitHub Release. If the
+#    CF_API_TOKEN secret is set and DuelLadder.toc has "## X-Curse-Project-ID:", it uploads to
+#    CurseForge too; otherwise that step is skipped.
+#
+# To ship a change: bump "## Version:" in DuelLadder.toc in the pull request.
 name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   tests:
@@ -22,7 +27,7 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the GitHub Release
+      contents: write # create the tag and the GitHub Release
     env:
       # packager@v2 reads GITHUB_OAUTH (newer packager versions also accept GH_API_TOKEN)
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
@@ -32,14 +37,23 @@ jobs:
         with:
           fetch-depth: 0 # the packager builds the changelog from the commit history
 
-      - name: Check the tag matches the .toc version
+      - name: Tag the version in the .toc (skip if already released)
+        id: version
         run: |
-          toc_version=$(sed -n 's/^## Version: *//p' DuelLadder.toc | tr -d '\r')
-          tag_version="${GITHUB_REF_NAME#v}"
-          if [ "$toc_version" != "$tag_version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match '## Version: $toc_version' in DuelLadder.toc"
+          version=$(sed -n 's/^## Version: *//p' DuelLadder.toc | tr -d '\r')
+          if [ -z "$version" ]; then
+            echo "::error::No '## Version:' line found in DuelLadder.toc"
             exit 1
           fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "Tag v$version already exists, so there's nothing new to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git tag "v$version"
+          git push origin "v$version"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Package and publish
+        if: steps.version.outputs.publish == 'true'
         uses: BigWigsMods/packager@v2
