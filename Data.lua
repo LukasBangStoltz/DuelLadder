@@ -262,7 +262,7 @@ function Data:RecordDuel(ctx)
         d = ctx.delta, z = ctx.zone or "",
         du = ctx.duration and math.floor(ctx.duration + 0.5) or nil, -- seconds, for when it started
     })
-    while #e.recent > Data.RECENT_MAX do table.remove(e.recent) end
+    for i = #e.recent, Data.RECENT_MAX + 1, -1 do e.recent[i] = nil end
     e.last = now
 
     ctx.newBadges = ns.Badges:Award(e, ctx)
