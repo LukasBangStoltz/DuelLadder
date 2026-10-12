@@ -93,4 +93,28 @@ python tests/run_all.py
 ```
 
 The tests can't show what the window looks like in the game, so changes to the UI still
-need a look in-game.
+need a look in-game. GitHub runs them on every push (`.github/workflows/tests.yml`).
+
+## Releasing
+
+Releases are built by the [BigWigs packager](https://github.com/BigWigsMods/packager)
+(`.github/workflows/release.yml`):
+
+1. Bump `## Version:` in `DuelLadder.toc` and commit.
+2. Tag the commit with the same version and push the tag:
+
+   ```bash
+   git tag v0.4.1
+   ```
+
+   ```bash
+   git push origin v0.4.1
+   ```
+
+3. GitHub runs the tests, checks the tag matches the `.toc` version, builds the zip
+   (without `tests/`, see `.pkgmeta`) and publishes the GitHub Release.
+
+**CurseForge:** add `## X-Curse-Project-ID: <id>` to `DuelLadder.toc` and a repository
+secret `CF_API_TOKEN` (an API token from https://authors.curseforge.com/account/api-tokens).
+From then on every release is uploaded to CurseForge too. `## Interface: 20506` is
+published as TBC Classic (Anniversary).

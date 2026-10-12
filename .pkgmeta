@@ -1,0 +1,6 @@
+# Read by the BigWigs packager when building release zips (.github/workflows/release.yml).
+package-as: DuelLadder
+
+# Not needed in game. (Files starting with a dot are always left out.)
+ignore:
+  - tests

@@ -17,7 +17,8 @@ FILES = []
 for line in open(os.path.join(ADDON, "DuelLadder.toc"), encoding="utf-8"):
     line = line.strip()
     if line and not line.startswith("#"):
-        FILES.append(XML_TO_LUA.get(line, line))
+        # The .toc uses Windows paths; make them work on Linux too (GitHub Actions).
+        FILES.append(XML_TO_LUA.get(line, line).replace("\\", "/"))
 
 HELPERS = r"""
 function SER(v)

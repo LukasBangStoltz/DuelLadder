@@ -1,0 +1,25 @@
+# Runs the out-of-game test suite (tests/run_all.py) on every push and pull request.
+# The release workflow runs it too, before publishing anything.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lupa (Lua 5.1 for Python)
+        run: pip install lupa
+
+      - name: Run tests
+        run: python tests/run_all.py
