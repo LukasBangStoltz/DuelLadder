@@ -24,7 +24,8 @@ jobs:
     permissions:
       contents: write # create the GitHub Release
     env:
-      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # packager@v2 reads GITHUB_OAUTH (newer packager versions also accept GH_API_TOKEN)
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
     steps:
       - uses: actions/checkout@v5
