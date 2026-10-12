@@ -1,10 +1,8 @@
-# Runs the out-of-game test suite (tests/run_all.py) on every push and pull request.
-# The release workflow runs it too, before publishing anything.
+# Runs the out-of-game test suite (tests/run_all.py) on every pull request.
+# The release workflow runs it too (after a merge into main), before publishing anything.
 name: Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_call:
 
