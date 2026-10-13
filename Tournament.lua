@@ -22,7 +22,7 @@ local Compat, Data = ns.Compat, ns.Data
 --
 -- Who owns what, for merging copies: the host owns the name, start, seeds, walkovers and the
 -- cancel (the copy with the higher hrev wins); each member owns their join; each bettor owns
--- their bets; games and payment confirmations are only ever added.
+-- their bets; games are only ever added, and confirmed payments only grow.
 local T = {}
 ns.Tournament = T
 
@@ -523,8 +523,9 @@ function T:MarkPaid(id, mid, from)
     local t, err = Get(id)
     if not t then return nil, err end
     for _, x in ipairs(ns.Bets.Transfers(T.Pot(t, mid))) do
-        if x.from == from and x.to == Me() then
-            PotFor(t, mid).paid[from .. ">" .. x.to] = true
+        if x.from == from and x.to == Me() and not x.paid then
+            local paid, k = PotFor(t, mid).paid, from .. ">" .. x.to
+            paid[k] = (paid[k] or 0) + x.copper
             Changed(t)
             return true
         end
@@ -748,14 +749,15 @@ function T:Merge(r)
             if not mine then
                 pot.stakes[key] = stake
                 changed = true
-            elseif stake.cancel and not mine.cancel then
+            elseif stake.cancel and (not mine.cancel or stake.cancel < mine.cancel) then
                 mine.cancel = stake.cancel
                 changed = true
             end
         end
-        for k in pairs(theirs.paid) do
-            if not pot.paid[k] then
-                pot.paid[k] = true
+        -- Only the receiver confirms a payment, and amounts only grow, so the bigger one is newer.
+        for k, copper in pairs(theirs.paid) do
+            if (pot.paid[k] or 0) < copper then
+                pot.paid[k] = copper
                 changed = true
             end
         end
@@ -770,7 +772,7 @@ local FORMAT_VERSION = "1"
 --   seeds:     n,n,...                      walkovers: match:n:time,...
 --   joins:     n:time:0|1 (1 = left),...    games:     match:end:start:winner:loser,...
 --   stakes:    pot:n:side:copper:time:cancelTime (0 = not cancelled),...
---   paid:      pot:from:to,...
+--   paid:      pot:from:to:copper,...
 function T.Serialize(t)
     local set = {}
     local function Add(key) set[key] = true end
@@ -805,9 +807,9 @@ function T.Serialize(t)
         for key, s in pairs(pot.stakes) do
             stakes[#stakes + 1] = ("%s:%d:%d:%d:%d:%d"):format(mid, ref[key], ref[s.side], s.amt, s.t, s.cancel or 0)
         end
-        for k in pairs(pot.paid) do
+        for k, copper in pairs(pot.paid) do
             local from, to = k:match("^(.-)>(.+)$")
-            paid[#paid + 1] = ("%s:%d:%d"):format(mid, ref[from], ref[to])
+            paid[#paid + 1] = ("%s:%d:%d:%d"):format(mid, ref[from], ref[to], copper)
         end
     end
     for _, list in ipairs({ wo, joins, games, stakes, paid }) do table.sort(list) end
@@ -854,8 +856,8 @@ function T.Deserialize(s)
             PotFor(t, mid).stakes[Name(k)] = { side = Name(side), amt = tonumber(amt), t = tonumber(time), cancel = cancel > 0 and cancel or nil }
         end
     end
-    for mid, from, to in f[15]:gmatch("([%w%.]+):(%d+):(%d+)") do
-        if Name(from) and Name(to) then PotFor(t, mid).paid[Name(from) .. ">" .. Name(to)] = true end
+    for mid, from, to, copper in f[15]:gmatch("([%w%.]+):(%d+):(%d+):(%d+)") do
+        if Name(from) and Name(to) then PotFor(t, mid).paid[Name(from) .. ">" .. Name(to)] = tonumber(copper) end
     end
     return t
 end
