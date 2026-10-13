@@ -290,7 +290,7 @@ check(rt == "Østen-Spineshatter|-17|Lion's Pride Inn Goldshire Elwynn |true", f
 
 # --- 11. UI: every tab renders -------------------------------------------------
 d.run("NS.UI:Toggle()")
-for tab in ["Ladder", "Members", "Matchups", "History", "Bets", "Badges"]:
+for tab in ["Ladder", "Members", "Matchups", "History", "Bets", "Tournament", "Badges"]:
     try:
         d.run(f'NS.UI:ShowTab("{tab}")')
         d.run("ADVANCE(1)")
@@ -318,7 +318,7 @@ check("Challenge Bo for" in d.eval("ALLTEXT()"), "clicking Bo switches to Bo's p
 # Badges tab: only Dina's own badges
 d.run('NS.UI:ShowTab("Badges")'); d.run("ADVANCE(1)")
 text = d.eval("ALLTEXT()")
-check("Your badges:" in text and "earned |cffffffff4|r of 18" in text, "badges tab counts Dina's 4 badges (incl. Kingslayer)")
+check("Your badges:" in text and "earned |cffffffff4|r of 21" in text, "badges tab counts Dina's 4 badges (incl. Kingslayer)")
 check("Progress: 1 / 50 duels" in text, "locked badges show progress (Veteran 1/50)")
 
 # Ladder rows: king has the crown

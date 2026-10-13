@@ -13,6 +13,8 @@ SlashCmdList.DUELLADDER = function(msg)
         UI:Toggle()
     elseif cmd == "bets" then
         UI:ShowTab("Bets")
+    elseif cmd == "tournament" or cmd == "t" then
+        UI:ShowTab("Tournament")
     elseif cmd == "me" then
         UI:ShowProfile(ns.Compat.PlayerKey())
     elseif cmd == "sync" then
@@ -33,6 +35,7 @@ SlashCmdList.DUELLADDER = function(msg)
         print("  |cffffffff/duels|r - show or hide the window")
         print("  |cffffffff/duels me|r - your profile")
         print("  |cffffffff/duels bets|r - open bets")
+        print("  |cffffffff/duels tournament|r - open the tournament")
         print("  |cffffffff/duels sync|r - ask the guild for fresh stats")
         print("  |cffffffff/duels guildonly|r - toggle counting only duels against guild members")
         print("  |cffffffff/duels announce|r - toggle posting your wins in guild chat")

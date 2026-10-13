@@ -22,7 +22,8 @@ for template, spacing in [("PanelTabButtonTemplate", 3), ("CharacterFrameTabButt
     ''')
     c.run("ADVANCE(5); NS.UI:Toggle()")
     w = max(c.eval("RESIZED").values())
-    end_px = 10 + 6 * w + spacing * 5
-    check(end_px <= 750, f"{template}: tabs are {w}px each and end at {end_px}px inside the 760px window")
+    n = c.eval('(function() local n = 0 while _G["DuelLadderFrameTab" .. (n + 1)] do n = n + 1 end return n end)()')
+    end_px = 10 + n * w + spacing * (n - 1)
+    check(end_px <= 750, f"{template}: {n} tabs of {w}px each end at {end_px}px inside the 760px window")
 print()
 print(f"{failures} failure(s)")

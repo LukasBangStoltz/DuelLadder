@@ -6,7 +6,7 @@ local Compat, Data, UI = ns.Compat, ns.Data, ns.UI
 -- Other people's badges are on their profile in the Members tab.
 
 local COLS = 2
-local CELL_W, CELL_H = 360, 42
+local CELL_W, CELL_H = 360, 34
 local TOP = 22
 local cells = {}
 local header, footer
@@ -23,12 +23,12 @@ local function Build(content)
         c:SetPoint("TOPLEFT", col * (CELL_W + 16), -TOP - row * (CELL_H + 2))
 
         c.icon = c:CreateTexture(nil, "ARTWORK")
-        c.icon:SetSize(32, 32)
+        c.icon:SetSize(30, 30)
         c.icon:SetPoint("TOPLEFT", 0, -2)
         c.icon:SetTexture(badge.texture)
 
         c.name = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        c.name:SetPoint("TOPLEFT", 40, -2)
+        c.name:SetPoint("TOPLEFT", 38, -2)
 
         c.desc = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         c.desc:SetPoint("LEFT", c.name, "RIGHT", 6, 0)
@@ -38,8 +38,8 @@ local function Build(content)
         c.desc:SetText("|cffaaaaaa" .. badge.desc .. "|r")
 
         c.status = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        c.status:SetPoint("TOPLEFT", 40, -20)
-        c.status:SetWidth(CELL_W - 40)
+        c.status:SetPoint("TOPLEFT", 38, -18)
+        c.status:SetWidth(CELL_W - 38)
         c.status:SetJustifyH("LEFT")
         c.status:SetWordWrap(false)
 
@@ -47,7 +47,7 @@ local function Build(content)
         cells[i] = c
     end
     footer = UI.CreateFooter(content, 2)
-    footer:SetText("Badges are earned automatically when a duel ends. To see someone else's badges, open their profile in the Members tab.")
+    footer:SetText("Badges are earned automatically when a duel or tournament ends. To see someone else's badges, open their profile in the Members tab.")
 end
 
 local function Refresh()
