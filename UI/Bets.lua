@@ -7,13 +7,13 @@ local Bets = ns.Bets
 -- payments once it's decided. Public pots can't be started any more, but ones made by older
 -- versions still show here so they can be cancelled and paid.
 
-local ROWS = 15
+local ROWS = 17
 local ROW_HEIGHT = 22
 local SHOW_FINISHED_DAYS = 3 -- finished pots and challenges stay in the list this long
 
 local COLUMNS = {
     { key = "status", label = "Status", width = 62 },
-    { key = "what",   label = "",       width = 250 },
+    { key = "what",   label = "",       width = 240 },
     { key = "pot",    label = "Pot",    width = 196 },
     { key = "you",    label = "You",    width = 110 },
     { key = "action", label = "",       width = 84 },
@@ -33,7 +33,16 @@ local STATUS = {
     expired = "|cff888888Expired|r",
 }
 
-local tbl, summary, footer
+-- Hover text for the row buttons.
+local ACTION_TIPS = {
+    Accept = "Put in the same amount. Whoever wins your next duel against them takes it all. You can cancel until the duel starts.",
+    Decline = "Turn the challenge down. Nobody owes anything.",
+    Cancel = "Take your bet back. Once the duel has started, it still counts.",
+    Pay = UI.PAY_TIP,
+    ["Got it"] = UI.GOT_IT_TIP,
+}
+
+local tbl, summary
 
 local function Name(key) return UI.Name(key, true) end
 local Money = Compat.MoneyText
@@ -167,10 +176,7 @@ local function Build(content)
     summary:SetPoint("TOPLEFT", 0, 0)
     summary:SetJustifyH("LEFT")
 
-    tbl = UI.CreateTable(content, COLUMNS, ROWS, {
-        top = 24, rowHeight = ROW_HEIGHT,
-        onScroll = function() UI:RequestRefresh() end,
-    })
+    tbl = UI.CreateTable(content, COLUMNS, ROWS, { top = 24, rowHeight = ROW_HEIGHT })
     local actionCol, youCol = COLUMNS[#COLUMNS], COLUMNS[#COLUMNS - 1]
     for _, row in ipairs(tbl.rows) do
         row.button = UI.Button(row, "", actionCol.width, function(self)
@@ -185,11 +191,13 @@ local function Build(content)
         row.button2:SetHeight(20)
         row.button2:SetPoint("LEFT", row, "LEFT", youCol.x, 0)
     end
+end
 
-    footer = UI.CreateFooter(content, 2)
-    footer:SetText("Challenge someone from their profile in Members. Cancel any time before the duel starts. "
-        .. "Pay fills in a trade or mail for you; the winner clicks Got it once they have the gold.")
-    footer:SetWordWrap(true)
+local function SetButton(button, action)
+    button:SetShown(action ~= nil)
+    if not action then return end
+    button:SetText(action)
+    UI.SetTooltip(button, action, ACTION_TIPS[action])
 end
 
 local function Refresh()
@@ -211,10 +219,8 @@ local function Refresh()
         c.what:SetText(item.what)
         c.pot:SetText("|cffaaaaaa" .. item.pot .. "|r")
         c.you:SetText(item.action2 and "" or item.you)
-        row.button:SetShown(item.action ~= nil)
-        if item.action then row.button:SetText(item.action) end
-        row.button2:SetShown(item.action2 ~= nil)
-        if item.action2 then row.button2:SetText(item.action2) end
+        SetButton(row.button, item.action)
+        SetButton(row.button2, item.action2)
         row.selectedTex:SetShown(item.priority == 1)
     end)
 
@@ -234,4 +240,4 @@ local function Refresh()
     summary:SetText(table.concat(parts, "   -   "))
 end
 
-UI:AddTab("Bets", Build, Refresh)
+UI:AddTab("Bets", Build, Refresh, function() return Bets:ActionCount() end)

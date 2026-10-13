@@ -47,7 +47,7 @@ local function Build(content)
         cells[i] = c
     end
     footer = UI.CreateFooter(content, 2)
-    footer:SetText("Badges are earned automatically when a duel or tournament ends. To see someone else's badges, open their profile in the Members tab.")
+    footer:SetText("Other members' badges are on their profile in Members.")
 end
 
 local function Refresh()

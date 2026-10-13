@@ -224,7 +224,12 @@ check(all_agree(lambda x: (T(x, "return T.Bracket(t).champion"), match(x, "3.1",
 
 # --- Paying -------------------------------------------------------------------------------
 ui(c)
-c.run("CLICK(FINDWHERE(function(o) return rawget(o, 'fn') and rawget(o, 'text') == 'Bets' end)); ADVANCE(1)")
+check(c.eval("FINDWHERE(function(o) return rawget(o, 'fn') and rawget(o, 'text') == 'Bets' end)") is None,
+      "the Bracket / Bets switch isn't one of the action buttons any more")
+check(c.eval("DuelLadderFrameTab4.text") == "Tournament |cffff8000(2)|r", "Carl's Tournament tab counts his two payments (final and champion pot)")
+check(c.eval("FINDWHERE(function(o) return rawget(o, 'mode') == 'bets' end).label.text") == "Bets |cffff8000(2)|r",
+      "and so does the Bets switch")
+c.run("CLICK(FINDWHERE(function(o) return rawget(o, 'mode') == 'bets' end)); ADVANCE(1)")
 text = c.eval("ALLTEXT()")
 check("You owe" in text and "To pay" in text, "Carl's Bets view lists what he owes")
 c.run("MailFrame:Show()")

@@ -36,7 +36,9 @@ for members who are offline.
     and there's a champion pot that closes when the host presses Start. Players can only bet
     on themselves.
 - **Badges** - 21 badges like Flawless, Clutch, Giant Slayer, Kingslayer, Chicken and Champion.
-- **Minimap button** with your record, the king and the top 3.
+- **Minimap button** with your record, the king, the top 3 and anything waiting on you.
+- **Counts on the tabs**: "Bets (2)" when challenges or payments need you, and the same on
+  the Tournament tab for tournament payments.
 
 ## Install
 
@@ -112,22 +114,15 @@ need a look in-game. GitHub runs them on every push (`.github/workflows/tests.ym
 
 ## Releasing
 
-Releases are built by the [BigWigs packager](https://github.com/BigWigsMods/packager)
-(`.github/workflows/release.yml`):
+Releases are automatic. Merging a pull request into `main` publishes one when the version
+in `DuelLadder.toc` is new (`.github/workflows/release.yml`):
 
-1. Bump `## Version:` in `DuelLadder.toc` and commit.
-2. Tag the commit with the same version and push the tag:
-
-   ```bash
-   git tag v0.4.1
-   ```
-
-   ```bash
-   git push origin v0.4.1
-   ```
-
-3. GitHub runs the tests, checks the tag matches the `.toc` version, builds the zip
-   (without `tests/`, see `.pkgmeta`) and publishes the GitHub Release.
+1. In the pull request, bump `## Version:` in `DuelLadder.toc`. A pull request that changes
+   addon files without a bump fails the "Version bump" check (`version-check.yml`).
+2. Merge it. GitHub runs the tests, tags the merge commit `v<version>`, and the
+   [BigWigs packager](https://github.com/BigWigsMods/packager) builds the zip (without
+   `tests/`, see `.pkgmeta`) and publishes the GitHub Release.
+3. Merges that don't change the version (docs, tests, workflows) publish nothing.
 
 **CurseForge:** the project ID is in `DuelLadder.toc` (`## X-Curse-Project-ID`), and the
 upload token is the repository secret `CF_API_TOKEN` (created under Author Settings → API

@@ -13,7 +13,8 @@ local TAB_INSET = 10          -- space between the window's edges and the outer 
 local tabSpacing = 0          -- set from the tab template when the window is made
 UI.CONTENT_WIDTH = WIDTH - 24
 UI.CONTENT_HEIGHT = HEIGHT - 40
-local tabs = {}               -- { label, build = fn(content), refresh = fn(content), content }
+local SCROLL_WIDTH = 8
+local tabs = {}               -- { label, build = fn(content), refresh = fn(content), count = fn(), content }
 local frame
 local currentTab
 local FitTabs
@@ -130,6 +131,30 @@ function UI.CreateFooter(content, y)
     return footer
 end
 
+local function TipEnter(self)
+    if not self.tipTitle then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(self.tipTitle)
+    if self.tipBody then GameTooltip:AddLine(self.tipBody, 1, 1, 1, true) end
+    GameTooltip:Show()
+end
+
+local function TipLeave() GameTooltip:Hide() end
+
+-- Hover text for a widget. Call it again to change the text; nil title shows nothing.
+function UI.SetTooltip(widget, title, body)
+    widget.tipTitle, widget.tipBody = title, body
+    if not widget.tipHooked then
+        widget.tipHooked = true
+        widget:HookScript("OnEnter", TipEnter)
+        widget:HookScript("OnLeave", TipLeave)
+    end
+end
+
+-- Hover text for the buttons that settle a bet, in the Bets and Tournament tabs.
+UI.PAY_TIP = "Fills in a trade if they're next to you, or a mail if you're at a mailbox. You still click Trade or Send yourself."
+UI.GOT_IT_TIP = "Click once they've paid you. It marks the payment as done for everyone."
+
 function UI.Button(parent, text, width, onClick)
     local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     b:SetSize(width, 22)
@@ -138,8 +163,9 @@ function UI.Button(parent, text, width, onClick)
     return b
 end
 
-function UI.CheckBox(parent, label, get, set)
+function UI.CheckBox(parent, label, get, set, tip)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    if tip then UI.SetTooltip(cb, label, tip) end
     cb:SetSize(22, 22)
     local text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     text:SetPoint("LEFT", cb, "RIGHT", 2, 1)
@@ -225,9 +251,10 @@ function UI.Report(ok, err)
     return ok
 end
 
--- A simple scrolling table: column headers plus a fixed number of rows. Scroll with the
--- mouse wheel. opts = { top, left, rowHeight, onClick(item, button), onEnter(row, item),
--- onHeaderClick(key), onScroll() }
+-- A simple scrolling table: column headers plus a fixed number of rows, with a scrollbar
+-- to the right of the last column (shown when there's more than fits). Scroll with the
+-- mouse wheel or the bar. Needs SCROLL_WIDTH + the column widths and gaps of room.
+-- opts = { top, left, rowHeight, onClick(item, button), onEnter(row, item), onHeaderClick(key) }
 function UI.CreateTable(parent, columns, numRows, opts)
     opts = opts or {}
     local left, top, rowHeight = opts.left or 0, opts.top or 0, opts.rowHeight or 18
@@ -287,15 +314,50 @@ function UI.CreateTable(parent, columns, numRows, opts)
         t.rows[i] = row
     end
 
+    local trackHeight = numRows * rowHeight
+    local bar = CreateFrame("Slider", nil, parent)
+    bar:SetPoint("TOPLEFT", left + x, -(top + 20))
+    bar:SetSize(SCROLL_WIDTH, trackHeight)
+    bar:EnableMouse(true)
+    bar:SetOrientation("VERTICAL")
+    bar:SetValueStep(1)
+    if bar.SetObeyStepOnDrag then bar:SetObeyStepOnDrag(true) end
+    local track = bar:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints()
+    track:SetColorTexture(1, 1, 1, 0.06)
+    local thumb = bar:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(SCROLL_WIDTH, 20)
+    thumb:SetColorTexture(1, 0.82, 0, 0.4)
+    bar:SetThumbTexture(thumb)
+    bar:SetScript("OnEnter", function() thumb:SetColorTexture(1, 0.82, 0, 0.7) end)
+    bar:SetScript("OnLeave", function() thumb:SetColorTexture(1, 0.82, 0, 0.4) end)
+    bar:SetScript("OnValueChanged", function(_, value)
+        value = math.floor(value + 0.5)
+        if t.syncing or value == t.offset then return end
+        t.offset = value
+        UI:RefreshNow()
+    end)
+    bar:Hide()
+    t.scrollBar = bar
+
     parent:EnableMouseWheel(true)
     parent:SetScript("OnMouseWheel", function(_, delta)
         t.offset = t.offset - delta * 3
-        if opts.onScroll then opts.onScroll() end
+        UI:RefreshNow()
     end)
 
     -- fillRow(row, item, index) sets the cells of one visible row.
     function t:Fill(items, fillRow)
-        self.offset = math.max(0, math.min(self.offset, #items - numRows))
+        local maxOffset = math.max(0, #items - numRows)
+        self.offset = math.max(0, math.min(self.offset, maxOffset))
+        bar:SetShown(maxOffset > 0)
+        if maxOffset > 0 then
+            thumb:SetHeight(math.max(16, math.floor(trackHeight * numRows / #items)))
+            self.syncing = true
+            bar:SetMinMaxValues(0, maxOffset)
+            bar:SetValue(self.offset)
+            self.syncing = false
+        end
         for i, row in ipairs(self.rows) do
             local item = items[i + self.offset]
             row.item = item
@@ -315,8 +377,24 @@ end
 -- Window and tabs
 ------------------------------------------------------------------------
 
-function UI:AddTab(label, build, refresh)
-    table.insert(tabs, { label = label, build = build, refresh = refresh })
+-- count, if given, returns how many things on the tab are waiting on us; the tab shows it.
+function UI:AddTab(label, build, refresh, count)
+    table.insert(tabs, { label = label, build = build, refresh = refresh, count = count })
+end
+
+-- "Bets (2)" when two things there need us.
+local function UpdateTabCounts()
+    local changed = false
+    for i, tab in ipairs(tabs) do
+        local button = _G["DuelLadderFrameTab" .. i]
+        local n = (tab.count and Data.guild) and tab.count() or 0
+        local text = n > 0 and ("%s |cffff8000(%d)|r"):format(tab.label, n) or tab.label
+        if button and button:GetText() ~= text then
+            button:SetText(text)
+            changed = true
+        end
+    end
+    if changed then FitTabs() end
 end
 
 local function SavePosition()
@@ -338,6 +416,7 @@ function UI:SelectTab(index)
     currentTab = index
     Data.settings.lastTab = index
     PanelTemplates_SetTab(frame, index)
+    UpdateTabCounts()
     FitTabs()
     for i, tab in ipairs(tabs) do
         if i == index then
@@ -466,6 +545,14 @@ function UI:ShowTab(label)
     end
 end
 
+-- Refreshes the visible tab right away (scrolling).
+function UI:RefreshNow()
+    local tab = tabs[currentTab]
+    if frame and frame:IsShown() and tab and tab.refresh and tab.content then
+        tab.refresh(tab.content)
+    end
+end
+
 -- Refreshes the visible tab when data changes. Bursts of changes become one refresh.
 local refreshPending = false
 function UI:RequestRefresh()
@@ -474,10 +561,8 @@ function UI:RequestRefresh()
     C_Timer.After(0.3, function()
         refreshPending = false
         UpdateTitle()
-        local tab = tabs[currentTab]
-        if frame:IsShown() and tab and tab.refresh and tab.content then
-            tab.refresh(tab.content)
-        end
+        UpdateTabCounts()
+        UI:RefreshNow()
     end)
 end
 

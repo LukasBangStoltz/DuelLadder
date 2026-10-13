@@ -350,6 +350,26 @@ function T.Pots(t)
     return list
 end
 
+-- Payments in this tournament we have to make or confirm.
+function T.Pending(t)
+    local me, n = Me(), 0
+    for _, view in ipairs(T.Pots(t)) do
+        for _, x in ipairs(ns.Bets.Transfers(view)) do
+            if not x.paid and (x.from == me or x.to == me) then n = n + 1 end
+        end
+    end
+    return n
+end
+
+-- The same across every tournament. The Tournament tab and the minimap button show it.
+function T:ActionCount()
+    local n = 0
+    for _, t in pairs(self:All()) do
+        if T.Started(t) then n = n + T.Pending(t) end
+    end
+    return n
+end
+
 ------------------------------------------------------------------------
 -- Actions (our own)
 ------------------------------------------------------------------------
