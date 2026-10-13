@@ -73,7 +73,20 @@ pay()
 b.run('UNITS.NPC = { "Anna", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANCE(2)')
 check("You only have" in b.prints() and b.eval("TRADE_MONEY") == 100000, "warns when you can't afford it, still fills in the amount")
 
-# 11. Never accepts the trade for you
+# 11. TRADE_SHOW arrives before the trade window is shown: still filled in
+b.run('MONEY = 1000 * 10000; TradeFrame:Hide(); UNITS.NPC = nil; TRADE_MONEY = 0')
+pay()
+b.run('UNITS.NPC = { "Anna", "" }; FIRE("TRADE_SHOW"); TradeFrame:Show(); ADVANCE(2)')
+check(b.eval("TRADE_MONEY") == 100000, "the gold is filled in even if the window shows just after the event")
+
+# 12. A trade with someone else first doesn't use up the payment
+b.run('TradeFrame:Hide(); UNITS.NPC = nil; TRADE_MONEY = 0')
+pay()
+b.run('UNITS.NPC = { "Carl", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANCE(1); TradeFrame:Hide()')
+b.run('UNITS.NPC = { "Anna", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANCE(1)')
+check(b.eval("TRADE_MONEY") == 100000, "Carl trades first, then Anna's trade opens: her gold is still filled in")
+
+# 13. Never accepts the trade for you
 check(b.eval("ACCEPTED") == 0 and a.eval("ACCEPTED") == 0, "the addon never clicks Trade")
 
 print(f"\n{failures} failure(s)")

@@ -25,6 +25,9 @@ for members who are offline.
   - *Public pots*: anyone can bet on either fighter. The winners split the losers' money by
     how much they bet.
   - Cancel until the duel starts. A cancel made mid-fight doesn't count.
+  - You can't bet more than you have: new bets must fit in your gold minus what's already
+    riding on undecided duels and what you still owe.
+  - A bet with no duel within 7 days expires and is void, even if they fight later.
   - DuelLadder never moves money: it works out who pays whom, **Pay** fills in a trade
     (if they're next to you) or a mail, and the winner confirms with **Got it**.
 - **Tournaments** - a knockout bracket of up to 16 players, drawn like a sports bracket.

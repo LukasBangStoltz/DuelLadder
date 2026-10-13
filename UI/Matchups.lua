@@ -126,6 +126,15 @@ local function UpdatePreview()
         popup.preview:SetText("")
         return
     end
+    local free = ns.Bets:Available()
+    if copper > free then
+        local committed = ns.Bets:Committed()
+        popup.preview:SetText(committed > 0
+            and ("|cffff4040You only have %s free to bet|r - %s is already riding on other bets or owed."):format(
+                Compat.MoneyText(free), Compat.MoneyText(committed))
+            or ("|cffff4040You only have %s.|r"):format(Compat.MoneyText(free)))
+        return
+    end
     local pool = ns.Bets:OpenPool(popup.a, popup.b)
     local back = pool and ns.Bets.PreviewReturn(pool, popup.pick, copper) or copper
     local profit = back - copper
@@ -169,13 +178,15 @@ local function CancelBet()
     local pool = ns.Bets:OpenPool(popup.a, popup.b)
     if not pool then return end
     if UI.Report(ns.Bets:Cancel(pool.id)) then
-        ns.Print("Your bet is cancelled.")
+        ns.Print("Your bet is cancelled. (If their duel had already started, it still counts.)")
         popup:Hide()
     end
 end
 
 local function CreatePopup(parent)
-    popup = CreateFrame("Frame", "DuelLadderBetPopup", parent, "BasicFrameTemplateWithInset")
+    local template = Compat.HasTemplate("BasicFrameTemplateWithInset")
+        and "BasicFrameTemplateWithInset" or "BasicFrameTemplate"
+    popup = CreateFrame("Frame", "DuelLadderBetPopup", parent, template)
     popup:SetSize(380, 230)
     popup:SetPoint("CENTER")
     popup:SetFrameStrata("DIALOG")
@@ -223,10 +234,10 @@ local function CreatePopup(parent)
     popup.cancel:SetPoint("BOTTOM", popup, "BOTTOM", 0, 12)
 end
 
--- Opens the popup for the public pot on the next duel between a and b.
-function UI:OpenBetPopup(a, b)
-    if not popup then CreatePopup(UI.frame) end
-    popup.a, popup.b = a, b
+-- Fills the popup for popup.a vs popup.b from the current pot. keepPick keeps the fighter
+-- the player picked (when the pot changes while the popup is open).
+local function FillPopup(keepPick)
+    local a, b = popup.a, popup.b
     popup.title:SetText(("Bet on %s vs %s"):format(Compat.DisplayName(a), Compat.DisplayName(b)))
     local wa, wb = RecordBetween(a, b)
     popup.hint:SetText(wa + wb > 0 and (LeaderText(a, b, wa, wb) .. ".") or "They haven't dueled yet.")
@@ -241,7 +252,6 @@ function UI:OpenBetPopup(a, b)
         popup.mineText:SetText(stake.cancel and "You cancelled your bet on this duel."
             or ("You have |cffffffff%s|r on %s."):format(Compat.MoneyText(stake.amt), Compat.DisplayName(stake.side)))
         popup.cancel:SetShown(not stake.cancel)
-        popup:Show()
         return
     end
     popup.mine:Hide()
@@ -258,9 +268,23 @@ function UI:OpenBetPopup(a, b)
     popup.backB:SetEnabled(not fighting or me == b)
     popup.note:SetText(fighting and "You're in this one, so you can only bet on yourself."
         or "All bets go into one pot; the winners split the losers' money by how much they bet.")
-    SetPick((fighting and me) or a)
+    local pick = keepPick and popup.pick
+    if (pick ~= a and pick ~= b) or (fighting and pick ~= me) then pick = (fighting and me) or a end
+    SetPick(pick)
+end
+
+-- Opens the popup for the public pot on the next duel between a and b.
+function UI:OpenBetPopup(a, b)
+    if not popup then CreatePopup(UI.frame) end
+    popup.a, popup.b = a, b
+    FillPopup(false)
     popup:Show()
 end
+
+-- Someone bet or cancelled while the popup is open: show the pot as it is now.
+ns:On("BETS_CHANGED", function()
+    if popup and popup:IsShown() then FillPopup(true) end
+end)
 
 ------------------------------------------------------------------------
 -- Rows

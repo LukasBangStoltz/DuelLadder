@@ -23,6 +23,29 @@ check(b.badge("Bo", "fb") is None, "Bo has no First Blood after only losses")
 duel("Bo", "Anna")
 check(b.badge("Bo", "fb") == 1, "Bo's first win after 3 losses gives First Blood")
 
+# Duel length only counts combat that belongs to the duel
+for x in (a, b):
+    x.L.globals().FIRE("PLAYER_REGEN_DISABLED")      # a mob fight...
+pump(10)
+for x in (a, b):
+    x.L.globals().FIRE("PLAYER_REGEN_ENABLED")       # ...that ended
+pump(200)
+for x in (a, b):
+    x.L.globals().FIRE("CHAT_MSG_SYSTEM", "Bo has fled from Anna in a duel")  # fled in the countdown
+pump(8)
+check(a.badge("Anna", "ma") is None and b.badge("Bo", "ma") is None, "an old mob fight doesn't make an instant flee a Marathon")
+check(a.eval('NS.Data:MyEntry().recent[1].du') is None, "that duel's length is unknown, not 210 seconds")
+for x in (a, b):
+    x.L.globals().FIRE("PLAYER_REGEN_DISABLED")      # a real duel...
+pump(125)
+for x in (a, b):
+    x.L.globals().FIRE("PLAYER_REGEN_ENABLED")       # ...where combat drops just before it ends
+pump(5)
+for x in (a, b):
+    x.L.globals().FIRE("CHAT_MSG_SYSTEM", "Anna has defeated Bo in a duel")
+pump(8)
+check(a.badge("Anna", "ma") == 1, "a real 2-minute duel is still a Marathon")
+
 # Relogging doesn't award again
 db = logout("Anna")
 a = login("Anna", "WARRIOR", 70, db)

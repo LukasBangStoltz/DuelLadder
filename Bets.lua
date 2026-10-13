@@ -8,16 +8,21 @@ local Compat, Data = ns.Compat, ns.Data
 --   * challenges: one fighter challenges the other for an amount; only those two are in it.
 --     The challenged player accepts (matching the amount) or declines.
 -- Both kinds can exist for the same duel. The next duel between the two that STARTS after
--- the pool opened decides it. The winners get their own gold back plus a share of the
--- losers' gold, split by how much each winner bet. If nobody bet on one side, nobody owes
--- anything.
+-- the pool opened (and within OPEN_DAYS of it) decides it. The winners get their own gold
+-- back plus a share of the losers' gold, split by how much each winner bet. If nobody bet on
+-- one side, nobody owes anything.
 --
--- DuelLadder never moves gold. When a pool is decided it works out the fewest payments
--- needed ("Erik pays Anna 15g"); the payer uses Pay (fills in a trade or mail) and the
--- receiver confirms with "Got it".
+-- DuelLadder never moves gold. When a pool is decided it works out who pays whom
+-- ("Erik pays Anna 15g"); the payer uses Pay (fills in a trade or mail) and the receiver
+-- confirms with "Got it". Confirmed payments are kept as amounts, so if a bet turns up late
+-- (its owner went offline before it synced) the remaining payments are worked out again
+-- around what has already been paid.
 --
 -- You can cancel your bet (or your challenge) until the duel starts. A cancel (or a new bet) made after the
 -- duel started doesn't count, so nobody can back out mid-fight.
+--
+-- You can't promise more gold than you have: new bets must fit in your gold minus what's
+-- already riding on undecided duels and what you still owe.
 --
 -- Each bet in a pool belongs to the person who placed it, so copies from different people
 -- are merged: stakes are added, cancels and payment confirmations are kept.
@@ -28,9 +33,9 @@ Bets.MIN_COPPER = 100              -- 1 silver
 Bets.MAX_COPPER = 10000 * 10000     -- 10,000 gold
 Bets.OPEN_DAYS = 7        -- a pool without a duel is void after this
 Bets.KEEP_DAYS = 30       -- finished pools are forgotten after this
-Bets.HIGH_ROLLER = 50     -- gold won in one pool for the badge
 
 local COPPER = 10000
+local DAY = 86400
 local counter = 0
 
 local function Me() return Compat.PlayerKey() end
@@ -45,6 +50,11 @@ end
 
 local function SamePair(pool, a, b)
     return (pool.a == a and pool.b == b) or (pool.a == b and pool.b == a)
+end
+
+-- Only a duel that starts by this time decides the pool; after it the pool has expired.
+local function Deadline(pool)
+    return pool.t + Bets.OPEN_DAYS * DAY
 end
 
 ------------------------------------------------------------------------
@@ -145,11 +155,9 @@ function Bets.Payouts(pool)
     return net
 end
 
--- The fewest payments that settle a decided pool: list of { from, to, copper, paid }.
--- Every client computes the same list from the same pool.
-function Bets.Transfers(pool)
-    local net = Bets.Payouts(pool)
-    if not net then return {} end
+-- Pairs up who owes (net < 0) with who's owed (net > 0), biggest first, into a short list
+-- of { from, to, copper }. Every client gets the same list from the same numbers.
+local function Settle(net)
     local creditors, debtors = {}, {}
     for key, amount in pairs(net) do
         if amount > 0 then creditors[#creditors + 1] = { key = key, left = amount } end
@@ -166,12 +174,60 @@ function Bets.Transfers(pool)
     while i <= #debtors and j <= #creditors do
         local d, c = debtors[i], creditors[j]
         local amount = math.min(d.left, c.left)
-        out[#out + 1] = { from = d.key, to = c.key, copper = amount, paid = pool.paid[d.key .. ">" .. c.key] or false }
+        out[#out + 1] = { from = d.key, to = c.key, copper = amount }
         d.left, c.left = d.left - amount, c.left - amount
         if d.left == 0 then i = i + 1 end
         if c.left == 0 then j = j + 1 end
     end
     return out
+end
+
+-- The payments that settle a decided pool: list of { from, to, copper, paid }. Confirmed
+-- payments (pool.paid["From>To"] = copper) come first; what's still owed is worked out
+-- around them, so a bet that turns up late only changes what hasn't been paid yet.
+function Bets.Transfers(pool)
+    local net = Bets.Payouts(pool)
+    if not net then return {} end
+    local out, left, done = {}, {}, {}
+    for key, amount in pairs(net) do left[key] = amount end
+    for k in pairs(pool.paid) do done[#done + 1] = k end
+    table.sort(done)
+    for _, k in ipairs(done) do
+        local from, to = k:match("^(.-)>(.+)$")
+        local copper = pool.paid[k]
+        if from and type(copper) == "number" and copper > 0 then
+            left[from] = (left[from] or 0) + copper
+            left[to] = (left[to] or 0) - copper
+            out[#out + 1] = { from = from, to = to, copper = copper, paid = true }
+        end
+    end
+    for _, t in ipairs(Settle(left)) do
+        t.paid = false
+        out[#out + 1] = t
+    end
+    return out
+end
+
+-- DuelLadder 0.4 and older stored a confirmed payment as just "From>To" = true, meaning
+-- that whole payment as it was worked out then. Turns those into amounts.
+local function NormalizePaid(pool)
+    local legacy, net
+    for k, v in pairs(pool.paid) do
+        if v == true then
+            if not legacy then
+                legacy, net = {}, Bets.Payouts(pool) or {}
+                for _, t in ipairs(Settle(net)) do legacy[t.from .. ">" .. t.to] = t.copper end
+            end
+            local amount = legacy[k]
+            if not amount then
+                -- The bets changed since it was confirmed: count what that payment could have been.
+                local from, to = k:match("^(.-)>(.+)$")
+                local owed, due = from and -(net[from] or 0) or 0, to and (net[to] or 0) or 0
+                if owed > 0 and due > 0 then amount = math.min(owed, due) end
+            end
+            pool.paid[k] = amount
+        end
+    end
 end
 
 -- "open", "settled" (payments outstanding), "paid", "void" (one-sided) or "expired" (no duel).
@@ -184,8 +240,15 @@ function Bets.State(pool)
         end
         return "paid"
     end
-    if Compat.Now() - pool.t > Bets.OPEN_DAYS * 86400 then return "expired" end
+    if Compat.Now() > Deadline(pool) then return "expired" end
     return "open"
+end
+
+-- Old finished pools nobody needs any more (anything with payments outstanding is kept).
+function Bets.Forgettable(pool)
+    if pool.t >= Compat.Now() - Bets.KEEP_DAYS * DAY then return false end
+    local state = Bets.State(pool)
+    return state ~= "open" and state ~= "settled"
 end
 
 function Bets.MyStake(pool)
@@ -225,14 +288,46 @@ local function Changed(id)
     ns:Fire("BETS_CHANGED")
 end
 
+-- Copper we've promised but not handed over: our bets on duels that haven't happened yet,
+-- plus what we still owe from decided ones.
+function Bets:Committed()
+    local me, total = Me(), 0
+    for _, pool in pairs(self:All()) do
+        if pool.res then
+            for _, t in ipairs(Bets.Transfers(pool)) do
+                if t.from == me and not t.paid then total = total + t.copper end
+            end
+        else
+            local stake = Bets.MyStake(pool)
+            if stake and Bets.State(pool) == "open" then total = total + stake.amt end
+        end
+    end
+    return total
+end
+
+-- Copper we can still put on a new bet.
+function Bets:Available()
+    return math.max(0, GetMoney() - self:Committed())
+end
+
+-- Can we put `copper` on top of everything we've already promised? verb: "bet" or "match".
+local function CheckFunds(copper, verb)
+    local committed = Bets:Committed()
+    if Compat.CanAfford(copper + committed) then return true end
+    if committed == 0 then
+        return nil, ("You only have %s, so you can't %s %s."):format(Compat.MoneyText(GetMoney()), verb, Compat.MoneyText(copper))
+    end
+    return nil, ("You only have %s free to bet, so you can't %s %s: %s of your %s is already riding on other bets or owed."):format(
+        Compat.MoneyText(Bets:Available()), verb, Compat.MoneyText(copper), Compat.MoneyText(committed), Compat.MoneyText(GetMoney()))
+end
+
 local function CheckAmount(copper)
     copper = math.floor(tonumber(copper) or 0)
     if copper < Bets.MIN_COPPER or copper > Bets.MAX_COPPER then
         return nil, ("Bets must be between %s and %s."):format(Compat.MoneyText(Bets.MIN_COPPER), Compat.MoneyText(Bets.MAX_COPPER))
     end
-    if not Compat.CanAfford(copper) then
-        return nil, ("You only have %s, so you can't bet %s."):format(Compat.MoneyText(GetMoney()), Compat.MoneyText(copper))
-    end
+    local ok, err = CheckFunds(copper, "bet")
+    if not ok then return nil, err end
     return copper
 end
 Bets.CheckAmount = CheckAmount
@@ -297,9 +392,8 @@ function Bets:Accept(id)
     if pool.stakes[me] then return nil, "You've already answered that challenge." end
     local theirs = pool.stakes[Bets.Challenger(pool)]
     if not theirs or theirs.cancel then return nil, "They cancelled that challenge." end
-    if not Compat.CanAfford(theirs.amt) then
-        return nil, ("You only have %s, so you can't match %s."):format(Compat.MoneyText(GetMoney()), Compat.MoneyText(theirs.amt))
-    end
+    local ok, err = CheckFunds(theirs.amt, "match")
+    if not ok then return nil, err end
     pool.stakes[me] = { side = me, amt = theirs.amt, t = Compat.Now() }
     Changed(id)
     return id
@@ -333,8 +427,9 @@ function Bets:MarkPaid(id, from)
     local pool = self:All()[id]
     if not pool then return false, "Unknown bet." end
     for _, t in ipairs(Bets.Transfers(pool)) do
-        if t.from == from and t.to == Me() then
-            pool.paid[from .. ">" .. t.to] = true
+        if t.from == from and t.to == Me() and not t.paid then
+            local k = from .. ">" .. t.to
+            pool.paid[k] = (pool.paid[k] or 0) + t.copper
             Changed(id)
             return true
         end
@@ -370,11 +465,18 @@ end
 
 ns:Listen("TRADE_SHOW", function()
     local p = pendingTrade
-    pendingTrade = nil
-    if not p or GetTime() > p.expires or Compat.TradePartner() ~= p.to then return end
-    -- The trade window clears its money fields as it opens, so fill in a moment later.
+    if not p then return end
+    if GetTime() > p.expires then
+        pendingTrade = nil
+        return
+    end
+    -- The trade window clears its money fields as it opens, so fill in a moment later. That
+    -- also gives the window time to show, so we can see who the trade is with. A trade with
+    -- someone else leaves the payment waiting.
     C_Timer.After(0.2, function()
-        if Compat.TradePartner() == p.to then FillTrade(p.to, p.copper) end
+        if pendingTrade ~= p or Compat.TradePartner() ~= p.to then return end
+        pendingTrade = nil
+        FillTrade(p.to, p.copper)
     end)
 end)
 
@@ -416,15 +518,16 @@ end
 -- Deciding pools, news and totals
 ------------------------------------------------------------------------
 
--- Decides every open pool whose duel has happened. Returns true if anything changed.
+-- Decides every pool whose duel has happened (before it expired). Returns true if anything changed.
 function Bets:Resolve()
     local changed = false
     for id, pool in pairs(self:All()) do
         if not pool.res then
             local winner, start = DecidingDuel(pool.a, pool.b, pool.t)
-            if winner then
+            if winner and start <= Deadline(pool) then
                 pool.res, pool.rs = winner, start
-                ns.Sync:SendPool(id)
+                -- Everyone online works this out from the same duel, so don't all send it.
+                ns.Sync:SharePool(id)
                 changed = true
             end
         end
@@ -432,6 +535,17 @@ function Bets:Resolve()
     if changed then ns:Fire("BETS_CHANGED") end
     self:Notify()
     return changed
+end
+
+-- Resolve soon. Stats arrive in bursts (a sync, a roster update), so they share one run.
+local resolveQueued = false
+function Bets:RequestResolve()
+    if resolveQueued then return end
+    resolveQueued = true
+    C_Timer.After(0.5, function()
+        resolveQueued = false
+        if Data.guild then Bets:Resolve() end
+    end)
 end
 
 -- High Roller counts pools where we won 50+ gold. Counting (instead of adding one per
@@ -542,16 +656,26 @@ function Bets:Balance()
     return total, owedToMe, iOwe
 end
 
--- Forgets old finished pools.
+-- Forgets old finished pools, and redirects to them that now lead nowhere.
 function Bets:Prune()
-    local cutoff = Compat.Now() - Bets.KEEP_DAYS * 86400
-    local pools = self:All()
+    local pools, alias = self:All(), Data.guild.poolAlias
     for id, pool in pairs(pools) do
-        local state = Bets.State(pool)
-        if state ~= "open" and state ~= "settled" and pool.t < cutoff then
+        if Bets.Forgettable(pool) then
             pools[id] = nil
             Data.guild.betSeen[id] = nil
         end
+    end
+    for from, to in pairs(alias) do
+        if not pools[to] then alias[from] = nil end
+    end
+end
+
+-- Fixes pools saved by DuelLadder 0.4 and older: payments confirmed without an amount, and
+-- pools that were decided by a duel after they had expired (those were void all along).
+function Bets:Repair()
+    for _, pool in pairs(self:All()) do
+        if pool.res and pool.rs > Deadline(pool) then pool.res, pool.rs = nil, nil end
+        NormalizePaid(pool)
     end
 end
 
@@ -597,26 +721,45 @@ end
 -- Merging and wire format
 ------------------------------------------------------------------------
 
+-- Two copies of one person's bet that differ (they bet in two pots that were later joined):
+-- everyone keeps the earlier one, so every copy of the pool ends up the same.
+local function Earlier(x, y)
+    if x.t ~= y.t then return x.t < y.t end
+    if x.amt ~= y.amt then return x.amt < y.amt end
+    return x.side < y.side
+end
+
 -- Folds pool `from` into pool `into` (same duel). Returns true if `into` changed.
+-- Merging in either order gives the same pool, so copies that met once stay equal.
 local function Absorb(into, from)
     local changed = false
     for key, stake in pairs(from.stakes) do
         local mine = into.stakes[key]
         if not mine then
-            into.stakes[key] = stake
+            into.stakes[key] = { side = stake.side, amt = stake.amt, t = stake.t, cancel = stake.cancel }
             changed = true
-        elseif stake.cancel and not mine.cancel then
-            mine.cancel = stake.cancel
+        else
+            if (stake.t ~= mine.t or stake.amt ~= mine.amt or stake.side ~= mine.side) and Earlier(stake, mine) then
+                mine.side, mine.amt, mine.t = stake.side, stake.amt, stake.t
+                changed = true
+            end
+            if stake.cancel and (not mine.cancel or stake.cancel < mine.cancel) then
+                mine.cancel = stake.cancel
+                changed = true
+            end
+        end
+    end
+    -- Only the receiver confirms a payment, and amounts only grow, so the bigger one is newer.
+    for k, copper in pairs(from.paid) do
+        if (into.paid[k] or 0) < copper then
+            into.paid[k] = copper
             changed = true
         end
     end
-    for k in pairs(from.paid) do
-        if not into.paid[k] then
-            into.paid[k] = true
-            changed = true
-        end
-    end
-    if from.res and (not into.res or from.rs < into.rs) and (from.res ~= into.res or from.rs ~= into.rs) then
+    -- The earliest deciding duel wins (ties: the same pick everywhere), as long as it started
+    -- before the pool expired.
+    if from.res and from.rs <= Deadline(into)
+        and (not into.res or from.rs < into.rs or (from.rs == into.rs and from.res < into.res)) then
         into.res, into.rs = from.res, from.rs
         changed = true
     end
@@ -634,15 +777,17 @@ end
 
 -- Merges a copy from someone else into ours. Returns true if ours changed.
 -- If two people opened a pot for the same duel at the same moment, everyone ends up
--- keeping the one with the smaller id and moves the other's bets into it.
+-- keeping the one with the smaller id and moves the other's bets into it. Only two OPEN
+-- pots are joined like that: an old expired pot is a different duel and stays apart.
 function Bets:Merge(r)
     local pools = self:All()
     local alias = Data.guild.poolAlias
     local targetId = alias[r.id] or r.id
     local p = pools[targetId]
     if p then return Absorb(p, r) end
+    if Bets.Forgettable(r) then return false end -- we pruned it (or would have)
 
-    if not r.res then
+    if Bets.State(r) == "open" then
         for id, other in pairs(pools) do
             if not other.res and not other.challenge and not r.challenge and id ~= r.id
                 and SamePair(other, r.a, r.b) and Bets.State(other) == "open" then
@@ -670,7 +815,9 @@ local FORMAT_VERSION = "2"
 -- 2;id;a;b;t;by;challenge;res;rs;stakes;paid
 --   stakes: Name-Realm=A|B:copper:time:cancelTime(0 = not cancelled),...
 --   (version 1, from 0.3.0, had whole gold instead of copper)
---   paid:   From-Realm>To-Realm,...
+--   paid:   From-Realm>To-Realm=copper,...
+--   Each payment is also listed as plain From-Realm>To-Realm, which is how DuelLadder 0.4 and
+--   older say "paid in full" (they ignore the entries with an amount).
 function Bets.Serialize(p)
     local stakes = {}
     for key, s in pairs(p.stakes) do
@@ -678,7 +825,10 @@ function Bets.Serialize(p)
     end
     table.sort(stakes)
     local paid = {}
-    for k in pairs(p.paid) do paid[#paid + 1] = k end
+    for k, copper in pairs(p.paid) do
+        paid[#paid + 1] = k
+        paid[#paid + 1] = ("%s=%d"):format(k, copper)
+    end
     table.sort(paid)
     return table.concat({
         FORMAT_VERSION, p.id, p.a, p.b, p.t, p.by, p.challenge or "", p.res or "", p.rs or 0,
@@ -700,12 +850,21 @@ function Bets.Deserialize(s)
     }
     if not p.t or not p.rs or p.id == "" or p.a == p.b then return nil end
     if p.res and p.res ~= p.a and p.res ~= p.b then return nil end
-    if not p.res then p.rs = nil end
+    -- No result, or one from a duel after the pool expired (older versions accepted those).
+    if not p.res or p.rs > Deadline(p) then p.res, p.rs = nil, nil end
     for key, side, amt, t, cancel in f[10]:gmatch("([^,=]+)=([AB]):(%d+):(%d+):(%d+)") do
         cancel = tonumber(cancel)
         p.stakes[key] = { side = side == "A" and p.a or p.b, amt = tonumber(amt) * unit, t = tonumber(t), cancel = cancel > 0 and cancel or nil }
     end
-    for k in f[11]:gmatch("([^,]+)") do p.paid[k] = true end
+    local plain = {}
+    for item in f[11]:gmatch("([^,]+)") do
+        local k, copper = item:match("^([^=]+)=(%d+)$")
+        if k then p.paid[k] = tonumber(copper) else plain[item] = true end
+    end
+    for k in pairs(plain) do
+        if not p.paid[k] then p.paid[k] = true end -- from 0.4 or older: amount worked out below
+    end
+    NormalizePaid(p)
     return p
 end
 
@@ -719,10 +878,11 @@ end
 ns:On("GUILD_READY", function()
     Bets:MigrateUnits()
     Bets:MigrateOldBets()
+    Bets:Repair()
     Bets:Prune()
     Bets:Resolve()
 end)
 
 ns:On("DATA_CHANGED", function()
-    if Data.guild then Bets:Resolve() end
+    if Data.guild then Bets:RequestResolve() end
 end)
