@@ -39,16 +39,6 @@ check(c.eval(f'NS.Bets:Cancel("{cid}")') is True and available(c) == 40 * G, "ca
 check(c.eval(f'NS.Bets:Accept("{did}")') == did and available(c) == 30 * G, "now he can accept: 30g left")
 pump(8)
 
-# The bet popup warns before you even press the button
-c.run(f'NS.UI:Toggle(); NS.UI:OpenBetPopup("{A}", "{D}")')
-c.run(f'DuelLadderBetPopup.money:SetCopper(50 * {G}); DuelLadderBetPopup.money.gold.scripts.OnTextChanged()')
-check("free to bet" in c.eval("DuelLadderBetPopup.preview.text"), "the bet popup says 50g is more than Carl has free")
-check("No bets" in c.eval("DuelLadderBetPopup.pot.text"), "popup: nobody has bet on Anna vs Dina yet")
-b.eval(f'NS.Bets:Place("{A}", "{D}", "{A}", 5 * {G})')
-pump(8)
-check("Pot:" in c.eval("DuelLadderBetPopup.pot.text"), "Bo bets while Carl's popup is open: the pot updates")
-c.run("DuelLadderBetPopup:Hide()")
-
 # Debts count too: Carl loses the challenge and owes Dina 10g until she confirms
 duel("Dina", "Carl")
 check(available(c) == 30 * G, "after losing, the 10g he owes still isn't free (30g)")

@@ -2,9 +2,10 @@ local _, ns = ...
 local Compat, Data, UI = ns.Compat, ns.Data, ns.UI
 local Bets = ns.Bets
 
--- Bets tab: payments and challenges waiting on you first, then every challenge and public pot:
--- who's on whom, how much, and what you have riding on it. Cancel until the duel starts;
--- pay or confirm payments once it's decided.
+-- Bets tab: payments and challenges waiting on you first, then every challenge: who's on whom,
+-- how much, and what you have riding on it. Cancel until the duel starts; pay or confirm
+-- payments once it's decided. Public pots can't be started any more, but ones made by older
+-- versions still show here so they can be cancelled and paid.
 
 local ROWS = 15
 local ROW_HEIGHT = 22
@@ -91,11 +92,7 @@ local function Describe(pool, items)
             item.what = Versus(pool)
             item.you = mine and ("%s on %s"):format(Money(mine.amt), Compat.DisplayName(mine.side))
                 or (stake and "|cff888888cancelled|r" or "-")
-            if mine then
-                item.action = "Cancel"
-            elseif not stake then
-                item.action = "Bet"
-            end
+            if mine then item.action = "Cancel" end
         end
     else
         local net = Bets.Payouts(pool)
@@ -139,9 +136,7 @@ end
 local function DoAction(item, which)
     local pool = item.pool
     local action = which == 2 and item.action2 or item.action
-    if action == "Bet" then
-        UI:OpenBetPopup(pool.a, pool.b)
-    elseif action == "Accept" then
+    if action == "Accept" then
         local theirs = pool.stakes[Bets.Challenger(pool)]
         if not theirs then return end
         UI.Confirm(("Accept %s's challenge for %s?\n\nYou put in the same amount, and whoever wins your next duel takes it all. You can cancel until the duel starts."):format(
@@ -192,8 +187,8 @@ local function Build(content)
     end
 
     footer = UI.CreateFooter(content, 2)
-    footer:SetText("Challenges are one-on-one. Public pots are shared: the winners split the losers' money by how much they bet. "
-        .. "Cancel any time before the duel starts. DuelLadder never moves money - Pay fills in a trade or mail, and the winner clicks Got it.")
+    footer:SetText("Challenge someone from their profile in Members. Cancel any time before the duel starts. "
+        .. "Pay fills in a trade or mail for you; the winner clicks Got it once they have the gold.")
     footer:SetWordWrap(true)
 end
 
@@ -235,7 +230,7 @@ local function Refresh()
     local committed = Bets:Committed()
     if committed > iOwe then parts[#parts + 1] = Money(committed - iOwe) .. " on open bets" end
     parts[#parts + 1] = "free to bet " .. Money(Bets:Available())
-    if #items == 0 then parts[#parts + 1] = "|cff888888nothing yet - bet from Matchups, challenge from Members|r" end
+    if #items == 0 then parts[#parts + 1] = "|cff888888nothing yet - challenge someone from Members|r" end
     summary:SetText(table.concat(parts, "   -   "))
 end
 

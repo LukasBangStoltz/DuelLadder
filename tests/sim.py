@@ -290,7 +290,7 @@ check(rt == "Østen-Spineshatter|-17|Lion's Pride Inn Goldshire Elwynn |true", f
 
 # --- 11. UI: every tab renders -------------------------------------------------
 d.run("NS.UI:Toggle()")
-for tab in ["Ladder", "Members", "Matchups", "History", "Bets", "Tournament", "Badges"]:
+for tab in ["Ladder", "Members", "Bets", "Tournament", "Badges"]:
     try:
         d.run(f'NS.UI:ShowTab("{tab}")')
         d.run("ADVANCE(1)")
@@ -304,7 +304,6 @@ check("Nemesis:" in text and "Favourite victim:" in text, "profile shows nemesis
 check("Against other members" in text, "profile shows records against other members")
 check("Your badges:" in text and "Progress: " in text, "badges tab shows your own collection with progress")
 check("Your betting total" in text, "bets tab shows a summary")
-check("scared off" in text, "history shows fled duels")
 check("Challenge Anna for" in text, "profile offers a challenge")
 
 # Members tab: clicking another member switches the profile
@@ -326,108 +325,28 @@ d.run('NS.UI:ShowTab("Ladder")'); d.run("ADVANCE(1)")
 text = d.eval("ALLTEXT()")
 check("UI-Group-LeaderIcon:0|t|cff" in text and "Dina" in text, "ladder shows the crown")
 
-# Matchups: Carl vs Bo is 5-0 from Carl's row
-d.run('NS.UI:ShowTab("Matchups")'); d.run("ADVANCE(1)")
-text = d.eval("ALLTEXT()")
-pairs_ = d.eval(r"""(function() local out, seen = {}, {}
-  local function walk(o, depth)
-    if depth > 14 or type(o) ~= "table" or seen[o] then return end
-    seen[o] = true
-    local p = rawget(o, "pair")
-    if type(p) == "table" and rawget(o, "shown") then out[#out+1] = p.a .. " " .. p.wa .. "-" .. p.wb .. " " .. p.b .. " | " .. rawget(o, "info").text end
-    for _, v in pairs(o) do walk(v, depth + 1) end
-  end
-  walk(_G, 0)
-  table.sort(out)
-  return table.concat(out, "|") end)()""")
-print("     matchup rows:", pairs_)
-check("Carl-Spineshatter 5-0 Bo-Spineshatter | 5 duels" in pairs_, "matchups list shows Carl 5 - 0 Bo, leader on the left")
-check("Anna-Spineshatter 1-1 Bo-Spineshatter" in pairs_, "Anna and Bo are all square at 1 - 1")
-# Bet button on the Carl-Bo row opens the popup with the record in words
-d.run(r"""
-  local found, seen = nil, {}
-  local function walk(o, depth)
-    if found or depth > 14 or type(o) ~= "table" or seen[o] then return end
-    seen[o] = true
-    local p = rawget(o, "pair")
-    if type(p) == "table" and p.a == "Carl-Spineshatter" and p.b == "Bo-Spineshatter" then found = o return end
-    for _, v in pairs(o) do walk(v, depth + 1) end
-  end
-  walk(_G, 0)
-  found.bet.scripts.OnClick(found.bet)
-""")
-check(d.eval("DuelLadderBetPopup.hint.text") == "Carl leads 5 - 0.", "row Bet button opens the popup with 'Carl leads 5 - 0'")
-# Picker: choose Erik as the second fighter, then Bet
-d.run(r"""
-  local pick = FINDTEXT("|cff888888choose...|r")
-  pick.scripts.OnClick(pick)
-  for _, item in ipairs(MENU_ITEMS) do if item.text and item.text:find("Erik") and item.func then item.func() end end
-  ADVANCE(1)
-""")
-check("Erik" in d.eval("ALLTEXT()") and d.eval('FINDTEXT("|cff888888choose...|r") == nil'), "picker lets you choose a second fighter")
-d.run(r"""
-  local found, seen = nil, {}
-  local function walk(o, depth)
-    if found or depth > 14 or type(o) ~= "table" or seen[o] then return end
-    seen[o] = true
-    if rawget(o, "text") == "Bet" and rawget(o, "scripts") and rawget(o, "parent") and rawget(rawget(o, "parent"), "nameA") == nil then found = o return end
-    for _, v in pairs(o) do walk(v, depth + 1) end
-  end
-  walk(_G, 0)
-  found.scripts.OnClick(found)
-""")
-check(d.eval("DuelLadderBetPopup.title.text") == "Bet on Dina vs Erik", "picker's Bet opens a popup for Dina vs Erik")
-check(d.eval("DuelLadderBetPopup.hint.text").startswith("They haven't dueled yet"), "popup says they haven't dueled yet")
+# The Matchups and History tabs are gone
+check(d.eval("NS.UI.OpenBetPopup") is None and d.eval("DuelLadderBetPopup") is None, "no public-pot bet popup any more")
 
-# History: each duel once even though both sides recorded it
-d.run('NS.UI:ShowTab("History")'); d.run("ADVANCE(1)")
-n_history = d.eval("(function() local n = 0 for _ in ALLTEXT():gmatch('defeated') do n = n + 1 end for _ in ALLTEXT():gmatch('scared off') do n = n + 1 end return n end)()")
-check(n_history <= 22, f"history merges both sides of a duel ({n_history} rows shown)")
-
-# Bet popup from the matchups list, placed through the confirm dialog
-before = d.eval("BETCOUNT()")
-d.run(f'NS.UI:OpenBetPopup("{A}", "{C}")')
-d.run('DuelLadderBetPopup.money:SetCopper(70000)')
-d.run("DuelLadderBetPopup.backB.scripts.OnClick(DuelLadderBetPopup.backB)")
-check("Nobody is on Anna yet" in d.eval("DuelLadderBetPopup.preview.text"), "preview explains you only win once someone bets on the other side")
-d.run('local btn = FINDTEXT("Place bet"); btn.scripts.OnClick(btn); ACCEPT_POPUP()')
-check(d.eval("BETCOUNT()") == before + 1, "placing a bet from the popup opens a new pot")
-npid = d.eval(f'NS.Bets:OpenPool("{A}", "{C}").id')
-check(d.eval(f'NS.Bets:All()["{npid}"].stakes["{D}"].side') == C, "Dina's 7g is on Carl")
-
-# Popup when you're one of the fighters: only your own side
-d.run(f'NS.UI:OpenBetPopup("{D}", "{B}")')
-check(d.eval("DuelLadderBetPopup.backB:IsEnabled()") is False and d.eval("DuelLadderBetPopup.pick") == D, "fighters can only back themselves in the popup")
-
-# Erik joins Dina's pot from the Bets tab: "Bet" opens the popup, he backs Anna
+# A public pot from an older version still shows in the Bets tab, with Cancel but no Bet
+opid = c.eval(f'NS.Bets:Place("{A}", "{C}", "{C}", 7 * {G})')
 pump(8)
 e.run("NS.UI:Toggle(); NS.UI:ShowTab('Bets')"); e.run("ADVANCE(1)")
-e.run(f"""
+def pot_button(client, pid):
+    return client.eval(f"""(function()
   local found, seen = nil, {{}}
   local function walk(o, depth)
     if found or depth > 14 or type(o) ~= "table" or seen[o] then return end
     seen[o] = true
     local item = rawget(o, "item")
-    if type(item) == "table" and item.pool and item.pool.id == "{npid}" and rawget(o, "button") then found = o.button return end
+    if type(item) == "table" and item.pool and item.pool.id == "{pid}" and rawget(o, "button") then found = o.button return end
     for _, v in pairs(o) do walk(v, depth + 1) end
   end
   walk(_G, 0)
-  found.scripts.OnClick(found)
-""")
-check(e.eval("DuelLadderBetPopup.title.text") == "Bet on Anna vs Carl", "Bets tab Bet button opens that duel's popup")
-check("Carl 7g (1 bet)" in e.eval("DuelLadderBetPopup.pot.text"), "popup shows the pot so far")
-e.run('DuelLadderBetPopup.money:SetCopper(140000); DuelLadderBetPopup.backA.scripts.OnClick(DuelLadderBetPopup.backA)')
-check("+ 7g" in e.eval("DuelLadderBetPopup.preview.text"), f"preview: 14g on Anna would win Dina's 7g ({e.eval('DuelLadderBetPopup.preview.text')})")
-e.run('local btn = FINDTEXT("Place bet"); btn.scripts.OnClick(btn); ACCEPT_POPUP()')
-pump(8)
-check(d.eval(f'NS.Bets:All()["{npid}"].stakes["{E}"].amt') == 140000, "Erik's 14g on Anna reached Dina")
-check("Erik put" in d.prints(), "Dina is told Erik joined her pot")
-
-# Reopening the popup with a bet in it offers Cancel
-d.run(f'NS.UI:OpenBetPopup("{A}", "{C}")')
-check("You have |cffffffff7g|r on Carl" in d.eval("DuelLadderBetPopup.mineText.text"), "popup shows your own bet")
-d.run('local btn = FINDTEXT("Cancel my bet"); btn.scripts.OnClick(btn)')
-check(d.eval(f'NS.Bets:All()["{npid}"].stakes["{D}"].cancel ~= nil'), "Cancel my bet withdraws it")
+  return found and found.shown and found.text or "" end)()""")
+check(pot_button(e, opid) == "", "Erik can't join someone else's pot from the Bets tab")
+c.run("NS.UI:Toggle(); NS.UI:ShowTab('Bets')"); c.run("ADVANCE(1)")
+check(pot_button(c, opid) == "Cancel", "Carl can still cancel his old pot bet")
 
 # Minimap tooltip
 tip = d.eval(r"""(function() local lines = {}

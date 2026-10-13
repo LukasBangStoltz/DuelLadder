@@ -17,13 +17,8 @@ for members who are offline.
 - **King of the Hill** - the first winner takes the crown; beat the king to take it.
 - **Members** - a profile for everyone with the addon: record, streaks, nemesis, favourite
   victim, biggest rival, badges and their record against every other member.
-- **Matchups** - every rivalry in the guild as a scoreboard line, with a Bet button.
-- **History** - recent duels across the guild with rating changes and where they happened.
-- **Bets** (gold and silver)
-  - *Challenges*: one-on-one. Challenge someone for an amount; they accept (matching it) or
-    decline. The winner of your next duel takes it all.
-  - *Public pots*: anyone can bet on either fighter. The winners split the losers' money by
-    how much they bet.
+- **Challenges** (gold and silver) - challenge someone from their profile for an amount;
+  they accept (matching it) or decline. The winner of your next duel takes it all.
   - Cancel until the duel starts. A cancel made mid-fight doesn't count.
   - You can't bet more than you have: new bets must fit in your gold minus what's already
     riding on undecided duels and what you still owe.
