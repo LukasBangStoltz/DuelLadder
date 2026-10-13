@@ -32,18 +32,15 @@ local function Current()
     return (shownId and all[shownId]) or T:Latest()
 end
 
--- "Anna 10g (2)  -  Bo 5g (1)" for a match, "40g from 4 bets" for the champion pot.
+-- "Anna 10g  -  Bo 5g" for a match, "40g" for the champion pot.
 local function PotText(view)
     local sides = T.Sides(view)
     local total, count = 0, 0
     for _, x in pairs(sides) do total, count = total + x.amt, count + x.count end
     if count == 0 then return "|cff888888no bets|r" end
     local m = view.match
-    if not m then return ("%s from %d bet%s"):format(Money(total), count, count == 1 and "" or "s") end
-    local function Side(key)
-        local x = sides[key] or { amt = 0, count = 0 }
-        return ("%s %s (%d)"):format(Short(key), Money(x.amt), x.count)
-    end
+    if not m then return Money(total) end
+    local function Side(key) return Short(key) .. " " .. Money(sides[key] and sides[key].amt or 0) end
     return Side(m.a) .. "  -  " .. Side(m.b)
 end
 
@@ -61,10 +58,9 @@ local function UpdatePreview()
     end
     local profit = T.PreviewReturn(T.Pot(t, popup.mid), popup.pick, copper) - copper
     if profit > 0 then
-        popup.preview:SetText(("If %s wins (with the pot as it is now) you get your %s back |cff20ff20+ %s|r"):format(
-            Short(popup.pick), Money(copper), Money(profit)))
+        popup.preview:SetText(("If %s wins: |cff20ff20+%s|r"):format(Short(popup.pick), Money(profit)))
     else
-        popup.preview:SetText("Nobody has bet against them yet - you only win something once someone does.")
+        popup.preview:SetText("Nobody has bet against them yet.")
     end
 end
 
@@ -85,10 +81,9 @@ local function PlaceBet()
     popup.money:ClearFocus()
     local tid, mid, pick = popup.tid, popup.mid, popup.pick
     local what = mid == T.CHAMPION and ("%s to win the tournament"):format(Short(pick)) or ("%s to win this match"):format(Short(pick))
-    UI.Confirm(("Bet %s on %s?\n\nThe winners split the losers' money by how much they bet. You can cancel until betting closes."):format(
-        Money(copper), what), function()
+    UI.Confirm(("Bet %s on %s?"):format(Money(copper), what), function()
         if UI.Report(T:Bet(tid, mid, pick, copper)) then
-            ns.Print("Bet placed. You'll see it under Tournament > Bets.")
+            ns.Print("Bet placed.")
             popup:Hide()
         end
     end)
@@ -153,14 +148,14 @@ local function OpenPopup(t, mid, side)
     local a, b
     if mid == T.CHAMPION then
         popup.title:SetText("Bet on the champion of " .. t.name)
-        popup.hint:SetText("Who wins it all? Betting closes when the host presses Start.")
+        popup.hint:SetText("Betting closes when the host presses Start.")
         a = side
     else
         local m = view.match
         local rounds = T.Bracket(t).rounds
         popup.title:SetText(("Bet on %s vs %s"):format(Short(m.a), Short(m.b)))
-        popup.hint:SetText(T.RoundName(m.r, rounds) .. (m.need > 1 and " - best of three. Betting closes when the first duel starts."
-            or " - their next duel decides it. Betting closes when it starts."))
+        popup.hint:SetText(T.RoundName(m.r, rounds) .. (m.need > 1 and " (best of three)" or "")
+            .. " - betting closes when they start dueling.")
         a, b = m.a, m.b
     end
 
@@ -172,7 +167,7 @@ local function OpenPopup(t, mid, side)
             or ("You have |cffffffff%s|r on %s."):format(Money(stake.amt), Short(stake.side)))
         local open = view.state == "open"
         popup.cancel:SetShown(open and not stake.cancel)
-        popup.mineNote:SetText(open and "You can cancel until betting closes." or "Betting has closed, so your bet stands.")
+        popup.mineNote:SetText(open and "" or "Betting has closed.")
         popup:Show()
         return
     end
@@ -193,8 +188,7 @@ local function OpenPopup(t, mid, side)
     local playing = me == a or me == b or (mid == T.CHAMPION and T.IsIn(t, me))
     popup.backA:SetEnabled(not playing or me == a)
     popup.backB:SetEnabled(not playing or me == b)
-    popup.note:SetText(playing and "You're playing, so you can only bet on yourself."
-        or "All bets go into one pot; the winners split the losers' money by how much they bet.")
+    popup.note:SetText(playing and "You're playing, so you can only bet on yourself." or "")
     SetPick((playing and me) or a)
     popup:Show()
 end
@@ -214,7 +208,7 @@ StaticPopupDialogs["DUELLADDER_NEW_TOURNAMENT"] = {
         local id, err = T:Create(box and box:GetText() or "")
         if UI.Report(id, err) then
             shownId = id
-            ns.Print("Tournament created. Guild members can join from the Tournament tab; press Start when everyone's in.")
+            ns.Print("Tournament created. Press Start when everyone has joined.")
         end
     end,
     EditBoxOnEnterPressed = function(self)
@@ -269,7 +263,7 @@ local function Actions(t, status)
     end
     if t.host == me and (status == "signup" or status == "running") then
         list[#list + 1] = { text = "Cancel", width = 70, fn = function()
-            UI.Confirm(("Cancel %s?\n\nBets on matches that haven't been decided are void."):format(t.name), function()
+            UI.Confirm(("Cancel %s? Undecided bets are void."):format(t.name), function()
                 UI.Report(T:Cancel(t.id))
             end)
         end }
@@ -278,8 +272,7 @@ local function Actions(t, status)
         if t.host == me then
             list[#list + 1] = { text = "Start", width = 70, fn = function()
                 local n = #T.Entrants(t)
-                UI.Confirm(("Start %s with %d players?\n\nSign-ups close, the bracket is seeded by ladder rating and bets on the champion are locked."):format(
-                    t.name, n), function() UI.Report(T:Start(t.id)) end)
+                UI.Confirm(("Start %s with %d players?"):format(t.name, n), function() UI.Report(T:Start(t.id)) end)
             end }
         end
         local j = t.joins[me]
@@ -316,11 +309,10 @@ end
 
 local SIGNUP_COLUMNS = {
     { key = "seed",   label = "#",            width = 22, align = "RIGHT" },
-    { key = "name",   label = "Player",       width = 180 },
-    { key = "rating", label = "Rating",       width = 50, align = "RIGHT" },
-    { key = "joined", label = "Joined",       width = 90 },
-    { key = "pot",    label = "Champion pot", width = 150 },
-    { key = "you",    label = "Your bet",     width = 110 },
+    { key = "name",   label = "Player",       width = 220 },
+    { key = "rating", label = "Rating",       width = 60, align = "RIGHT" },
+    { key = "pot",    label = "Bets on them", width = 140 },
+    { key = "you",    label = "Your bet",     width = 140 },
     { key = "action", label = "",             width = 80 },
 }
 
@@ -351,8 +343,7 @@ local function RefreshSignup(t)
         c.seed:SetText(item.seed or "-")
         c.name:SetText(item.waiting and ("|cff888888%s (waiting list)|r"):format(Short(item.key)) or UI.Name(item.key))
         c.rating:SetText(T.Rating(item.key))
-        c.joined:SetText("|cffaaaaaa" .. UI.Ago(t.joins[item.key] and t.joins[item.key].t) .. "|r")
-        c.pot:SetText(side and ("%s (%d)"):format(Money(side.amt), side.count) or "|cff888888-|r")
+        c.pot:SetText(side and Money(side.amt) or "|cff888888-|r")
         local mine = stake and not stake.cancel and stake.side == item.key
         c.you:SetText(mine and Money(stake.amt) or "")
         local canBet = not item.waiting and not stake and (not T.IsIn(t, me) or item.key == me)
@@ -361,8 +352,7 @@ local function RefreshSignup(t)
     end)
     empty:SetShown(#items == 0)
     empty:SetText("Nobody has joined yet. Click Join to be the first.")
-    footer:SetText("When the host presses Start, the bracket is seeded by ladder rating (the top seeds get the byes). Only duels "
-        .. "after that count. Bet on the champion until then; players can only back themselves.")
+    footer:SetText("The bracket is seeded by ladder rating when the host presses Start.")
 end
 
 ------------------------------------------------------------------------
@@ -388,34 +378,20 @@ end
 
 local function BoxEnter(self)
     local t, m = Current(), self.match
-    if not t or not m then return end
-    local b = T.Bracket(t)
+    if not t or not m or not m.open or m.bye then return end
+    local view = T.Pot(t, m.id)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(T.RoundName(m.r, b.rounds))
-    if m.bye then
-        GameTooltip:AddLine(("Bye: %s goes straight through."):format(Short(m.winner)), 1, 1, 1)
-    elseif not m.open then
-        GameTooltip:AddLine("Waiting for the earlier matches.", 1, 1, 1)
-    else
-        GameTooltip:AddLine(UI.Name(m.a, true) .. "  vs  " .. UI.Name(m.b, true))
-        if m.winner then
-            local how = m.walkover and " (walkover)" or (m.need > 1 and (" %d - %d"):format(math.max(m.wa, m.wb), math.min(m.wa, m.wb)) or "")
-            GameTooltip:AddLine(("%s won%s"):format(Short(m.winner), how), 0.2, 1, 0.2)
-        elseif m.need > 1 then
-            GameTooltip:AddLine(("Best of three, first to two wins. %d - %d so far."):format(m.wa, m.wb), 1, 1, 1)
-        else
-            GameTooltip:AddLine("Their next duel decides it.", 1, 1, 1)
-        end
-        if not m.winner then GameTooltip:AddLine("Only duels after " .. UI.Ago(m.open) .. " count.", 0.8, 0.8, 0.8) end
-        local view = T.Pot(t, m.id, b)
-        GameTooltip:AddLine("Pot: " .. PotText(view), 0.8, 0.8, 0.8)
-        local stake = t.pots[m.id] and t.pots[m.id].stakes[Compat.PlayerKey()]
-        if stake and not stake.cancel then
-            GameTooltip:AddLine(("You have %s on %s"):format(Money(stake.amt), Short(stake.side)), 1, 0.82, 0)
-        end
-        if view.state == "open" then GameTooltip:AddLine("Click to bet", 0.6, 0.6, 0.6) end
-        if m.live and t.host == Compat.PlayerKey() then GameTooltip:AddLine("Right-click to award a walkover", 0.6, 0.6, 0.6) end
+    GameTooltip:AddLine(UI.Name(m.a, true) .. "  vs  " .. UI.Name(m.b, true))
+    if m.winner then
+        GameTooltip:AddLine(Short(m.winner) .. " won" .. (m.walkover and " (walkover)" or ""), 0.2, 1, 0.2)
     end
+    GameTooltip:AddLine("Pot: " .. PotText(view), 1, 1, 1)
+    local stake = t.pots[m.id] and t.pots[m.id].stakes[Compat.PlayerKey()]
+    if stake and not stake.cancel then
+        GameTooltip:AddLine(("Your bet: %s on %s"):format(Money(stake.amt), Short(stake.side)), 1, 0.82, 0)
+    end
+    if view.state == "open" then GameTooltip:AddLine("Click to bet", 0.6, 0.6, 0.6) end
+    if m.live and t.host == Compat.PlayerKey() then GameTooltip:AddLine("Right-click for a walkover", 0.6, 0.6, 0.6) end
     GameTooltip:Show()
 end
 
@@ -561,12 +537,11 @@ local function RefreshBracket(t)
 
     local status = T.Status(t, b)
     if status == "cancelled" then
-        footer:SetText("|cffff4040This tournament was cancelled.|r Bets on matches that weren't decided are void.")
+        footer:SetText("|cffff4040Cancelled.|r Undecided bets are void.")
     elseif status == "finished" then
-        footer:SetText(("%s won it. Hover over a match for the details; Bets shows who pays whom."):format(Short(b.champion)))
+        footer:SetText(("%s won the tournament."):format(Short(b.champion)))
     else
-        footer:SetText("A match is decided by the first duel between its two players after it opens (the final is best of three). "
-            .. "Hover over a match for details, click it to bet.")
+        footer:SetText("Click a match to bet on it. The final is best of three.")
     end
 end
 
@@ -663,9 +638,8 @@ local function RefreshBets(t)
         row.selectedTex:SetShown(item.priority == 1)
     end)
     empty:SetShown(#items == 0)
-    empty:SetText("No bets in this tournament yet. Click a match in the bracket to bet on it.")
-    footer:SetText("Each match has its own pot, open until its first duel starts; a walkover voids it. The champion pot closed at the start. "
-        .. "DuelLadder never moves money - Pay fills in a trade or mail, and the winner clicks Got it.")
+    empty:SetText("No bets yet. Click a match in the bracket to bet on it.")
+    footer:SetText("Pay fills in a trade or mail for you; the winner clicks Got it once they have the gold.")
 end
 
 ------------------------------------------------------------------------
@@ -705,12 +679,6 @@ local function Build(content)
     signup = Body()
     signupTable = UI.CreateTable(signup, SIGNUP_COLUMNS, SIGNUP_ROWS, {
         rowHeight = 19, onScroll = function() UI:RequestRefresh() end,
-        onEnter = function(row, item)
-            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(UI.Name(item.key, true))
-            GameTooltip:AddLine(item.waiting and "On the waiting list: the tournament is full." or "Signed up", 1, 1, 1)
-            GameTooltip:Show()
-        end,
     })
     RowButton(signupTable, SignupAction)
 
@@ -756,8 +724,7 @@ local function Refresh()
     if not t then
         title:SetText("Tournament")
         sub:SetText("No tournament yet.")
-        empty:SetText("Host one with New tournament. Guild members join, you press Start, and the bracket fills in by "
-            .. "itself as people duel. The winner of each match meets the winner of the next one, until one champion is left.")
+        empty:SetText("Click New tournament to host one. The bracket fills in by itself as people duel.")
         empty:Show()
         footer:SetText("")
         return

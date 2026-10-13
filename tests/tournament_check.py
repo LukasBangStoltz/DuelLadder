@@ -100,7 +100,7 @@ pump(10)
 # The sign-up list in the Tournament tab
 text = ui(o)
 check("Friday Fights" in text and "sign-ups open: 5 / 16 players" in text, "Tournament tab shows the sign-ups")
-check("Champion pot" in text and "20g (1)" in text, "the list shows how much is on each player to win")
+check("Bets on them" in text and "20g" in text, "the list shows how much is on each player to win")
 # Erik backs himself through the row's Bet button and the popup
 ui(e)
 e.run(f"""
