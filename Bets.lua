@@ -235,6 +235,7 @@ local function CheckAmount(copper)
     end
     return copper
 end
+Bets.CheckAmount = CheckAmount
 
 local function NewPool(a, b, extra)
     counter = counter + 1
@@ -377,19 +378,23 @@ ns:Listen("TRADE_SHOW", function()
     end)
 end)
 
--- Pays what we owe `to` in a pool: fills in an open trade or mail, or opens a trade if
--- they're close by. The player always confirms the trade or mail themselves.
+-- Pays what we owe `to` in a pool.
 function Bets:Pay(id, to)
     local pool = self:All()[id]
     local copper = pool and OwedTo(pool, to)
-    if not copper then return end
+    if copper then self:SendMoney(to, copper, "DuelLadder bet") end
+end
+
+-- Pays `to`: fills in an open trade or mail, or opens a trade if they're close by. The player
+-- always confirms the trade or mail themselves.
+function Bets:SendMoney(to, copper, subject)
     local name = Compat.DisplayName(to)
 
     if Compat.TradePartner() == to then
         FillTrade(to, copper)
         return
     end
-    if Compat.PrefillMail(Compat.MailName(to), copper, "DuelLadder bet") then
+    if Compat.PrefillMail(Compat.MailName(to), copper, subject) then
         ns.Print(("Mail to %s filled in with %s. Check it and press Send."):format(name, Compat.MoneyText(copper)))
         return
     end

@@ -17,6 +17,7 @@ Core.lua
 Data.lua
 Badges.lua
 Bets.lua
+Tournament.lua
 Sync.lua
 Duel.lua
 
@@ -26,6 +27,7 @@ UI\Members.lua
 UI\Matchups.lua
 UI\History.lua
 UI\Bets.lua
+UI\Tournament.lua
 UI\Badges.lua
 
 Commands.lua

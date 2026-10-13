@@ -27,7 +27,17 @@ for members who are offline.
   - Cancel until the duel starts. A cancel made mid-fight doesn't count.
   - DuelLadder never moves money: it works out who pays whom, **Pay** fills in a trade
     (if they're next to you) or a mail, and the winner confirms with **Got it**.
-- **Badges** - 18 badges like Flawless, Clutch, Giant Slayer, Kingslayer and Chicken.
+- **Tournaments** - a knockout bracket of up to 16 players, drawn like a sports bracket.
+  - Anyone can host. Members join; the host presses Start, which seeds the bracket by ladder
+    rating (the top seeds get the byes) and locks it.
+  - A match is decided by the first duel between its two players after the match opens.
+    Duels from before that never count. The final is best of three. Tournament duels count
+    for the ladder too.
+  - The host can give a walkover (right-click the match) when someone doesn't show up.
+  - Every match has its own pot (open until its first duel starts; a walkover voids it),
+    and there's a champion pot that closes when the host presses Start. Players can only bet
+    on themselves.
+- **Badges** - 21 badges like Flawless, Clutch, Giant Slayer, Kingslayer, Chicken and Champion.
 - **Minimap button** with your record, the king and the top 3.
 
 ## Install
@@ -47,6 +57,7 @@ Everyone in the guild should run the same version: sync formats change between v
 | `/duels` | Show or hide the window |
 | `/duels me` | Your profile |
 | `/duels bets` | Open the Bets tab |
+| `/duels tournament` | Open the Tournament tab |
 | `/duels sync` | Ask the guild for fresh stats (normally automatic) |
 | `/duels guildonly` | Toggle counting only duels against guild members |
 | `/duels announce` | Toggle posting your wins in guild chat |
@@ -58,7 +69,10 @@ Everyone in the guild should run the same version: sync formats change between v
   client's own localized strings, so it works in any language. Each duelist records their
   own side.
 - Only the owner of a character changes its stats; everyone else keeps the copy with the
-  highest revision. Bets are merged, since several people change parts of them.
+  highest revision. Bets and tournaments are merged, since several people change parts of them.
+- Every client works out a tournament's bracket from the duel history the same way, so it
+  keeps going when the host is offline. Duels that decide matches are copied into the
+  tournament, since each character only keeps its last 10 duels.
 - Everything that differs between game clients lives in `Compat.lua`, to make porting to
   WoW Forever easier. The addon never reads combat data.
 
@@ -71,6 +85,7 @@ Everyone in the guild should run the same version: sync formats change between v
 | `Data.lua` | Saved data, rating, titles, crown, wire format |
 | `Badges.lua` | Badge definitions and awarding |
 | `Bets.lua` | Challenges, pots, payouts, payments |
+| `Tournament.lua` | Tournaments: sign-ups, bracket, results, tournament pots |
 | `Sync.lua` | Guild sync over addon messages |
 | `Duel.lua` | Detecting duel results |
 | `UI/` | The window and one file per tab |

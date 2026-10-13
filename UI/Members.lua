@@ -8,7 +8,7 @@ local Compat, Data, UI = ns.Compat, ns.Data, ns.UI
 local LIST_ROWS = 22
 local PANEL_X = 200
 local VS_LINES = 10
-local BADGE_SIZE = 24
+local BADGE_SIZE = 21
 
 local selected
 local list

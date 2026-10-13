@@ -6,11 +6,13 @@ local Compat, Data = ns.Compat, ns.Data
 --   Q^<version>                          "I just came online, send me what you have"
 --   E^<key>^<rev>^<part>^<parts>^...     a character's stats, split into chunks
 --   P^<id>^<hash>^<part>^<parts>^...     a betting pool, split into chunks
+--   T^<id>^<hash>^<part>^<parts>^...     a tournament, split into chunks
 -- (B^ was a one-on-one bet in 0.2; ignored now.)
 --
 -- When someone asks, everyone waits a random moment and then sends what they know,
 -- skipping anything someone else just sent. That way offline members' stats (including
--- your alts) and betting pools still reach new people without everyone repeating them.
+-- your alts), betting pools and tournaments still reach new people without everyone
+-- repeating them.
 local Sync = {}
 ns.Sync = Sync
 
@@ -22,7 +24,7 @@ local BURST, REGEN = 8, 1   -- our own throttle: messages in a burst, messages r
 local HEARD_WINDOW = 30     -- seconds something someone else sent counts as "already sent"
 local BUFFER_TTL = 60       -- seconds to keep half-received items
 
--- What we can send. version(item) is a rev for stats and a checksum for pools.
+-- What we can send. version(item) is a rev for stats and a checksum for pools and tournaments.
 local KINDS = {
     E = {
         get = function(id) return Data:Entries()[id] end,
@@ -36,6 +38,12 @@ local KINDS = {
         serialize = function(b) return ns.Bets.Serialize(b) end,
         version = function(b) return ns.Bets.Hash(b) end,
         covered = function(heardVer, b) return heardVer == ns.Bets.Hash(b) end,
+    },
+    T = {
+        get = function(id) return ns.Tournament:All()[id] end,
+        serialize = function(t) return ns.Tournament.Serialize(t) end,
+        version = function(t) return ns.Tournament.Hash(t) end,
+        covered = function(heardVer, t) return heardVer == ns.Tournament.Hash(t) end,
     },
 }
 
@@ -149,6 +157,12 @@ function Sync:SendPool(id)
     Queue("P", id, true)
 end
 
+-- Sends a tournament we changed. Not forced when we only picked up a result everyone can see.
+function Sync:SendTourney(id, force)
+    if not Data.guild then return end
+    Queue("T", id, force)
+end
+
 -- Asks the guild for everything they know.
 function Sync:Request()
     if not Data.guild or not IsInGuild() then return end
@@ -166,6 +180,7 @@ local function OnRequest()
         Queue("E", Compat.PlayerKey(), true)
         for key in pairs(Data:Entries()) do Queue("E", key, false) end
         for id in pairs(ns.Bets:All()) do Queue("P", id, false) end
+        for id in pairs(ns.Tournament:All()) do Queue("T", id, false) end
     end)
 end
 
@@ -177,12 +192,15 @@ local function OnComplete(kind, id, ver, payload)
             if Data:CheckCrown() then Sync:SendOwn() end
             ns:Fire("DATA_CHANGED")
         end
-    else
+    elseif kind == "P" then
         local b = ns.Bets.Deserialize(payload)
         if b and b.id == id and ns.Bets:Merge(b) then
             ns:Fire("BETS_CHANGED")
             ns.Bets:Resolve()
         end
+    elseif kind == "T" then
+        local t = ns.Tournament.Deserialize(payload)
+        if t and t.id == id and ns.Tournament:Merge(t) then ns.Tournament:Update() end
     end
 end
 
@@ -195,11 +213,11 @@ local function OnChunk(sender, kind, text)
     -- Someone is sending this, so we don't need to repeat it.
     local slot = kind .. ":" .. id
     local h = heard[slot]
-    if kind == "P" or not h or ver >= h.ver then heard[slot] = { ver = ver, t = GetTime() } end
+    if kind ~= "E" or not h or ver >= h.ver then heard[slot] = { ver = ver, t = GetTime() } end
 
     -- Skip what we already have.
     local cur = KINDS[kind].get(id)
-    if cur and ((kind == "E" and cur.rev >= ver) or (kind == "P" and ns.Bets.Hash(cur) == ver)) then return end
+    if cur and ((kind == "E" and cur.rev >= ver) or (kind ~= "E" and KINDS[kind].version(cur) == ver)) then return end
 
     local now = GetTime()
     for bufId, buf in pairs(buffers) do

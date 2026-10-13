@@ -84,6 +84,16 @@ Badges.LIST = {
     { id = "hr", name = "High Roller", icon = "INV_Misc_Coin_02", repeatable = true,
       desc = "Win a bet of 50 gold or more.",
       check = function(e, ctx) return ctx.betWon and ctx.betWon >= 50 end },
+    -- Tournament badges are counted by Tournament.lua, never on a duel.
+    { id = "tc", name = "Champion", icon = "INV_Crown_02", repeatable = true,
+      desc = "Win a tournament.",
+      check = function() return false end },
+    { id = "tf", name = "Finalist", icon = "INV_BannerPVP_02", repeatable = true,
+      desc = "Reach the final of a tournament.",
+      check = function() return false end },
+    { id = "ts", name = "Upset", icon = "Ability_Warrior_Challange", repeatable = true,
+      desc = "Knock the No. 1 seed out of a tournament.",
+      check = function() return false end },
 }
 
 Badges.BY_ID = {}
