@@ -182,12 +182,21 @@ function Compat.TradePartner()
     return Compat.UnitKey("NPC") -- the trade partner's unit token
 end
 
+-- Types an amount into one of Blizzard's gold/silver/copper boxes. Not every client's box
+-- works with MoneyInputFrame_SetCopper (on TBC Anniversary the trade box throws), so try it
+-- quietly and fall back to the newer SetAmount. Returns true if one of them took it.
+local function SetMoneyBox(box, copper)
+    if not box then return false end
+    if MoneyInputFrame_SetCopper and pcall(MoneyInputFrame_SetCopper, box, copper) then return true end
+    if type(box.SetAmount) == "function" and pcall(box.SetAmount, box, copper) then return true end
+    return false
+end
+
 -- Puts gold in our side of the open trade window. Never clicks Trade: the player checks the
 -- trade and accepts it themselves.
 function Compat.PrefillTrade(copper)
-    if TradePlayerInputMoneyFrame and MoneyInputFrame_SetCopper then
-        -- Type it into the gold box, so the window shows it like the player typed it.
-        MoneyInputFrame_SetCopper(TradePlayerInputMoneyFrame, copper)
+    -- Type it into the gold box, so the window shows it like the player typed it.
+    if SetMoneyBox(TradePlayerInputMoneyFrame, copper) then
         -- The box normally hands the amount to the trade. If the trade didn't pick it up,
         -- set it directly.
         C_Timer.After(0.3, function()
@@ -210,9 +219,7 @@ function Compat.PrefillMail(recipient, copper, subject)
     if MailFrameTab_OnClick then MailFrameTab_OnClick(nil, 2) end
     if SendMailNameEditBox then SendMailNameEditBox:SetText(recipient) end
     if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(subject) end
-    if SendMailMoney and MoneyInputFrame_SetCopper then
-        MoneyInputFrame_SetCopper(SendMailMoney, copper)
-    end
+    SetMoneyBox(SendMailMoney, copper)
     return true
 end
 
