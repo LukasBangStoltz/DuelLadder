@@ -368,7 +368,7 @@ local function Clean(s)
 end
 
 local function Guild(msg)
-    if IsInGuild() then SendChatMessage(msg, "GUILD") end
+    if IsInGuild() then Compat.SendChatMessage(msg, "GUILD") end
 end
 
 function T:Create(name)

@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- Every API call that can differ between clients (TBC Anniversary now, WoW Forever later)
+-- Every API call that can differ between clients (TBC Anniversary, Retail, and WoW Forever later)
 -- lives here. The rest of the addon only talks to Compat.
 local Compat = {}
 ns.Compat = Compat
@@ -274,8 +274,14 @@ function Compat.PlaySound(name)
 end
 
 ------------------------------------------------------------------------
--- Addon messages
+-- Chat and addon messages
 ------------------------------------------------------------------------
+
+-- Retail moved SendChatMessage into C_ChatInfo; older clients only have the global.
+function Compat.SendChatMessage(text, channel)
+    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+    send(text, channel)
+end
 
 function Compat.RegisterPrefix(prefix)
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then

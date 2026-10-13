@@ -47,8 +47,9 @@ for members who are offline.
 
 1. Download the latest zip from [Releases](https://github.com/LukasBangStoltz/DuelLadder/releases),
    or clone this repo.
-2. Put it in `World of Warcraft\_anniversary_\Interface\AddOns` so you have
-   `AddOns\DuelLadder\DuelLadder.toc`.
+2. Put it in the AddOns folder of your client so you have `AddOns\DuelLadder\DuelLadder.toc`:
+   - TBC Anniversary: `World of Warcraft\_anniversary_\Interface\AddOns`
+   - Retail: `World of Warcraft\_retail_\Interface\AddOns`
 3. Restart the game (a `/reload` won't pick up new files).
 
 Everyone in the guild should run the same version: sync formats change between versions.
@@ -136,7 +137,9 @@ Releases are built by the [BigWigs packager](https://github.com/BigWigsMods/pack
 **CurseForge:** the project ID is in `DuelLadder.toc` (`## X-Curse-Project-ID`), and the
 upload token is the repository secret `CF_API_TOKEN` (created under Author Settings → API
 Tokens on authors.curseforge.com). Every release is uploaded to CurseForge too.
-`## Interface: 20506` is published as TBC Classic (Anniversary).
+One zip works in every client: `## Interface: 20506, 120100` lists one version per client
+(TBC Anniversary, Retail), and the packager tags the CurseForge file with all of them. When a
+client patches, update its number there.
 
 ## License
 
