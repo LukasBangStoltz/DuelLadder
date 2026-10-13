@@ -39,13 +39,18 @@ local function CleanName(name)
 end
 
 -- Duel length: from when we entered combat to the result. Good enough for badges.
-local combatStart
-ns:Listen("PLAYER_REGEN_DISABLED", function() combatStart = GetTime() end)
+-- If we left combat well before the result, that combat was something else (a duel where
+-- nobody attacked, e.g. someone fled during the countdown), so the length is unknown.
+local COMBAT_GAP = 15 -- seconds out of combat before the result that still count as the duel
+local combatStart, combatEnd
+ns:Listen("PLAYER_REGEN_DISABLED", function() combatStart, combatEnd = GetTime(), nil end)
+ns:Listen("PLAYER_REGEN_ENABLED", function() combatEnd = GetTime() end)
 
 local function Duration()
-    if not combatStart then return nil end
-    local d = GetTime() - combatStart
+    local start, now = combatStart, GetTime()
     combatStart = nil
+    if not start or (combatEnd and now - combatEnd > COMBAT_GAP) then return nil end
+    local d = now - start
     if d < 0 or d > 600 then return nil end
     return d
 end

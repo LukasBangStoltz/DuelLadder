@@ -9,8 +9,9 @@ local Compat, Data = ns.Compat, ns.Data
 -- (B^ was a one-on-one bet in 0.2; ignored now.)
 --
 -- When someone asks, everyone waits a random moment and then sends what they know,
--- skipping anything someone else just sent. That way offline members' stats (including
--- your alts) and betting pools still reach new people without everyone repeating them.
+-- skipping anything someone else sent since that request. That way offline members' stats
+-- (including your alts) and betting pools still reach new people without everyone
+-- repeating them, however long the queue takes to send.
 local Sync = {}
 ns.Sync = Sync
 
@@ -19,7 +20,7 @@ ns.PREFIX = PREFIX
 
 local CHUNK_SIZE = 170      -- payload bytes per message (the limit is 255 including the header)
 local BURST, REGEN = 8, 1   -- our own throttle: messages in a burst, messages regained per second
-local HEARD_WINDOW = 30     -- seconds something someone else sent counts as "already sent"
+local HEARD_WINDOW = 600    -- seconds something someone else sent counts as "already sent" (a request resets it)
 local BUFFER_TTL = 60       -- seconds to keep half-received items
 
 -- What we can send. version(item) is a rev for stats and a checksum for pools.
@@ -149,6 +150,15 @@ function Sync:SendPool(id)
     Queue("P", id, true)
 end
 
+-- Sends a pool that others online are probably working out themselves right now (a duel
+-- just decided it): after a short random wait, and only if nobody sent the same copy.
+function Sync:SharePool(id)
+    if not Data.guild then return end
+    C_Timer.After(math.random() * 3, function()
+        if Data.guild then Queue("P", id, false) end
+    end)
+end
+
 -- Asks the guild for everything they know.
 function Sync:Request()
     if not Data.guild or not IsInGuild() then return end
@@ -158,6 +168,8 @@ function Sync:Request()
 end
 
 local function OnRequest()
+    -- The one asking hasn't heard anything yet: what was sent before doesn't count for them.
+    wipe(heard)
     if gossipScheduled then return end
     gossipScheduled = true
     C_Timer.After(1 + math.random() * 5, function()
@@ -179,10 +191,16 @@ local function OnComplete(kind, id, ver, payload)
         end
     else
         local b = ns.Bets.Deserialize(payload)
-        if b and b.id == id and ns.Bets:Merge(b) then
+        if not b or b.id ~= id then return end
+        if ns.Bets:Merge(b) then
             ns:Fire("BETS_CHANGED")
-            ns.Bets:Resolve()
+            ns.Bets:RequestResolve()
         end
+        -- Our copy has something theirs doesn't (say a bet placed just before its owner went
+        -- offline, and they're back now): send ours, so it reaches everyone.
+        local ourId = Data.guild.poolAlias[id] or id
+        local ours = ns.Bets:All()[ourId]
+        if ours and ns.Bets.Hash(ours) ~= ver then Sync:SharePool(ourId) end
     end
 end
 

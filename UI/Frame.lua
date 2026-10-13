@@ -30,11 +30,20 @@ end
 UI.ONLINE_DOT = Dot(40, 230, 40)
 UI.OFFLINE_DOT = Dot(100, 100, 100)
 
+-- Data:King() looks through every member, and a refresh draws dozens of names: work it out
+-- once per frame.
+local king, kingFrame
+local function CurrentKing()
+    local now = GetTime()
+    if kingFrame ~= now then king, kingFrame = Data:King(), now end
+    return king
+end
+
 -- Class-coloured name, with the crown for the King of the Hill and a star for our own characters.
 function UI.Name(key, plain)
     local text = Compat.ClassColorCode(Data:ClassOf(key)) .. Compat.DisplayName(key) .. "|r"
     if plain then return text end
-    if Data:King() == key then text = UI.CROWN .. text end
+    if CurrentKing() == key then text = UI.CROWN .. text end
     if Data.db.myChars[key] then text = text .. " |cffffd100*|r" end
     return text
 end

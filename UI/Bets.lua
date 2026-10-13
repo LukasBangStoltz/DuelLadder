@@ -143,6 +143,7 @@ local function DoAction(item, which)
         UI:OpenBetPopup(pool.a, pool.b)
     elseif action == "Accept" then
         local theirs = pool.stakes[Bets.Challenger(pool)]
+        if not theirs then return end
         UI.Confirm(("Accept %s's challenge for %s?\n\nYou put in the same amount, and whoever wins your next duel takes it all. You can cancel until the duel starts."):format(
             Compat.DisplayName(Bets.Challenger(pool)), Money(theirs.amt)), function()
             UI.Report(Bets:Accept(pool.id))
@@ -151,9 +152,11 @@ local function DoAction(item, which)
         UI.Report(Bets:Decline(pool.id))
     elseif action == "Cancel" then
         local mine = Bets.MyStake(pool)
+        if not mine then return end -- cancelled meanwhile; the list catches up in a moment
         local text = pool.challenge and ("Cancel your %s challenge?"):format(Money(mine.amt))
             or ("Cancel your %s bet on %s?"):format(Money(mine.amt), Compat.DisplayName(mine.side))
-        UI.Confirm(text, function() UI.Report(Bets:Cancel(pool.id)) end)
+        UI.Confirm(text .. "\n\nIf the duel has already started, your bet still counts.",
+            function() UI.Report(Bets:Cancel(pool.id)) end)
     elseif action == "Pay" then
         Bets:Pay(pool.id, item.transfer.to)
     elseif action == "Got it" then
@@ -229,6 +232,9 @@ local function Refresh()
     local parts = { "Your betting total: " .. totalText }
     if owedToMe > 0 then parts[#parts + 1] = "people owe you " .. Money(owedToMe) end
     if iOwe > 0 then parts[#parts + 1] = "|cffff4040you owe " .. Money(iOwe) .. "|r" end
+    local committed = Bets:Committed()
+    if committed > iOwe then parts[#parts + 1] = Money(committed - iOwe) .. " on open bets" end
+    parts[#parts + 1] = "free to bet " .. Money(Bets:Available())
     if #items == 0 then parts[#parts + 1] = "|cff888888nothing yet - bet from Matchups, challenge from Members|r" end
     summary:SetText(table.concat(parts, "   -   "))
 end

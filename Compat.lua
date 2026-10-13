@@ -134,10 +134,6 @@ function Compat.MoneyText(copper)
     return text
 end
 
-function Compat.GoldText(gold)
-    return Compat.MoneyText(gold * 10000)
-end
-
 function Compat.CanAfford(copper)
     return GetMoney() >= copper
 end
