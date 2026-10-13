@@ -1,7 +1,7 @@
 ## Interface: 20506
 ## Title: DuelLadder
 ## Notes: Guild duel ladder - ratings, titles, King of the Hill, badges, head-to-head records and gold bets for every character in your guild.
-## Version: 0.5.0
+## Version: 0.6.0
 ## SavedVariables: DuelLadderDB
 ## IconTexture: Interface\Icons\Ability_DualWield
 ## X-Curse-Project-ID: 1741904
