@@ -14,16 +14,32 @@ def transfers(x, pid):
 def stake(x, pid, who, field="amt"):
     return x.eval(f'(function() local s = NS.Bets:All()["{pid}"].stakes["{who}"]; return s and s.{field} end)()')
 
+def waiting(x): return x.eval("NS.Bets:ActionCount()")
+
 # 1. Challenge with silver: 2g 50s, accepted, decided
 cid = a.eval(f'NS.Bets:Challenge("{B}", 2 * {G} + 50 * {S})')
 pump(8)
 check("2g 50s" in b.prints(), "Bo is told the challenge is for 2g 50s")
+check((waiting(a), waiting(b), waiting(c)) == (0, 1, 0), "the challenge waits on Bo only")
+b.run("NS.UI:Toggle(); NS.UI:ShowTab('Ladder'); ADVANCE(1)")
+check(b.eval("DuelLadderFrameTab3.text") == "Bets |cffff8000(1)|r", "Bo's Bets tab shows (1)")
 check(b.eval(f'NS.Bets:Accept("{cid}")') == cid, "Bo accepts")
 pump(8)
 check(stake(a, cid, B) == 25000, "Anna sees Bo matched 2g 50s")
 check("accepted your challenge" in a.prints(), "Anna is told Bo accepted")
+check((waiting(a), waiting(b)) == (0, 0), "once accepted, nothing waits on either of them")
+check(b.eval("DuelLadderFrameTab3.text") == "Bets", "Bo's Bets tab drops the count")
 duel("Anna", "Bo")
 check(all_agree(lambda x: transfers(x, cid), "payments") == f"{B}>{A}:25000", "Bo pays Anna 2g 50s")
+check((waiting(a), waiting(b), waiting(c)) == (1, 1, 0), "the payment waits on Bo (Pay) and Anna (Got it)")
+tip = b.eval(r"""(function() local lines = {}
+  local tt = { AddLine = function(_, t) lines[#lines+1] = t end, AddDoubleLine = function(_, a, b) lines[#lines+1] = a .. ' = ' .. b end }
+  LibStub('LibDataBroker-1.1'):GetDataObjectByName('DuelLadder').OnTooltipShow(tt)
+  return table.concat(lines, ' | ') end)()""")
+check("Bets: 1 waiting on you" in tip, "Bo's minimap tooltip says so too")
+check(a.eval(f'NS.Bets:MarkPaid("{cid}", "{B}")') is True, "Anna confirms Bo paid")
+pump(8)
+check((waiting(a), waiting(b)) == (0, 0), "once paid, nothing waits on either of them")
 
 # 2. Decline
 did = a.eval(f'NS.Bets:Challenge("{C}", 5 * {G})')

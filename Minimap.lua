@@ -33,6 +33,10 @@ local function ShowTooltip(tooltip)
         local _, owedToMe, iOwe = ns.Bets:Balance()
         if iOwe > 0 then tooltip:AddLine("You owe " .. Compat.MoneyText(iOwe) .. " in bets", 1, 0.25, 0.25) end
         if owedToMe > 0 then tooltip:AddLine("You're owed " .. Compat.MoneyText(owedToMe) .. " in bets", 0.25, 1, 0.25) end
+        -- The same counts as on the tabs.
+        local bets, tourney = ns.Bets:ActionCount(), ns.Tournament:ActionCount()
+        if bets > 0 then tooltip:AddLine(("Bets: %d waiting on you"):format(bets), 1, 0.5, 0) end
+        if tourney > 0 then tooltip:AddLine(("Tournament: %d payment%s to settle"):format(tourney, tourney == 1 and "" or "s"), 1, 0.5, 0) end
     end
     tooltip:AddLine(" ")
     tooltip:AddLine("Click to open DuelLadder", 0.6, 0.6, 0.6)

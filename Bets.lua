@@ -656,6 +656,23 @@ function Bets:Balance()
     return total, owedToMe, iOwe
 end
 
+-- How many things are waiting on us: challenges to accept or decline, and payments to make
+-- or confirm. The Bets tab and the minimap button show it.
+function Bets:ActionCount()
+    local me, n = Me(), 0
+    for _, pool in pairs(self:All()) do
+        if pool.res then
+            for _, t in ipairs(Bets.Transfers(pool)) do
+                if not t.paid and (t.from == me or t.to == me) then n = n + 1 end
+            end
+        elseif pool.challenge == me and not pool.stakes[me] and Bets.State(pool) == "open" then
+            local theirs = pool.stakes[Bets.Challenger(pool)]
+            if theirs and not theirs.cancel then n = n + 1 end
+        end
+    end
+    return n
+end
+
 -- Forgets old finished pools, and redirects to them that now lead nowhere.
 function Bets:Prune()
     local pools, alias = self:All(), Data.guild.poolAlias

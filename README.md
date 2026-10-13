@@ -36,7 +36,9 @@ for members who are offline.
     and there's a champion pot that closes when the host presses Start. Players can only bet
     on themselves.
 - **Badges** - 21 badges like Flawless, Clutch, Giant Slayer, Kingslayer, Chicken and Champion.
-- **Minimap button** with your record, the king and the top 3.
+- **Minimap button** with your record, the king, the top 3 and anything waiting on you.
+- **Counts on the tabs**: "Bets (2)" when challenges or payments need you, and the same on
+  the Tournament tab for tournament payments.
 
 ## Install
 

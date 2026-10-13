@@ -3,13 +3,16 @@ local Compat, Data, UI = ns.Compat, ns.Data, ns.UI
 local T, Bets = ns.Tournament, ns.Bets
 
 -- Tournament tab. During sign-ups: who's in, in seed order (by rating), with the champion
--- pot. Once it has started: the bracket, drawn like a sports bracket with the winners moving
--- right towards the champion. "Bets" lists every pot in the tournament with what you have
--- riding on it and any payments.
+-- pot. Once it has started, two views under the header: the bracket, drawn like a sports
+-- bracket with the winners moving right towards the champion, and "Bets", every pot in the
+-- tournament with what you have riding on it and any payments.
 
 local W = UI.CONTENT_WIDTH
-local TOP = 50                -- below the header
-local BRACKET_HEIGHT = 350
+local TOP = 50                -- below the header (sign-ups)
+local VIEWS_Y = 46            -- the Bracket / Bets switch, once it has started
+local VIEWS_HEIGHT = 20
+local VIEWS_TOP = VIEWS_Y + VIEWS_HEIGHT + 6 -- below the switch
+local BRACKET_HEIGHT = 328
 local BOX_HEIGHT = 32
 local LINE = 2
 local SIGNUP_ROWS = 16
@@ -22,6 +25,7 @@ local shownId                 -- tournament on screen; nil = the latest
 local mode = "bracket"        -- "bracket" or "bets", once it has started
 local title, sub, footer, empty
 local actionButtons = {}
+local views = {}              -- the Bracket / Bets switch: buttons, plus the line under them
 local signup, bracket, betsView
 local signupTable, betsTable
 local boxes, lines, champBox = {}, {}, nil
@@ -234,7 +238,10 @@ local function ShowList(owner)
     local items = { { text = "Tournaments", isTitle = true } }
     for _, t in ipairs(list) do
         local status = T.Status(t)
-        items[#items + 1] = { text = ("%s |cff888888(%s, %s)|r"):format(t.name, status, UI.Ago(t.t)), func = function()
+        local pending = T.Started(t) and T.Pending(t) or 0
+        local text = ("%s |cff888888(%s, %s)|r"):format(t.name, status, UI.Ago(t.t))
+        if pending > 0 then text = text .. (" |cffff8000%d to settle|r"):format(pending) end
+        items[#items + 1] = { text = text, func = function()
             shownId = t.id
             UI:RequestRefresh()
         end }
@@ -248,21 +255,18 @@ local function Actions(t, status)
     local list = {}
     local count = 0
     for _ in pairs(T:All()) do count = count + 1 end
-    if count > 1 then list[#list + 1] = { text = "Tournaments", width = 100, fn = ShowList } end
+    if count > 1 then
+        list[#list + 1] = { text = "Tournaments", width = 100, fn = ShowList, tip = "Look at another tournament." }
+    end
     local latest = T:Latest()
     local latestStatus = latest and T.Status(latest)
     if latestStatus ~= "signup" and latestStatus ~= "running" then
-        list[#list + 1] = { text = "New tournament", width = 120, fn = New }
+        list[#list + 1] = { text = "New tournament", width = 120, fn = New,
+            tip = "Host a knockout tournament for up to 16 players. The bracket fills in by itself as people duel." }
     end
     if not t then return list end
-    if T.Started(t) then
-        list[#list + 1] = { text = mode == "bets" and "Bracket" or "Bets", width = 80, fn = function()
-            mode = mode == "bets" and "bracket" or "bets"
-            UI:RequestRefresh()
-        end }
-    end
     if t.host == me and (status == "signup" or status == "running") then
-        list[#list + 1] = { text = "Cancel", width = 70, fn = function()
+        list[#list + 1] = { text = "Cancel", width = 70, tip = "Call the tournament off. Undecided bets are void.", fn = function()
             UI.Confirm(("Cancel %s? Undecided bets are void."):format(t.name), function()
                 UI.Report(T:Cancel(t.id))
             end)
@@ -270,16 +274,20 @@ local function Actions(t, status)
     end
     if status == "signup" then
         if t.host == me then
-            list[#list + 1] = { text = "Start", width = 70, fn = function()
+            list[#list + 1] = { text = "Start", width = 70,
+                tip = "Seed the bracket by ladder rating (the top seeds get the byes) and lock it. The champion pot closes.", fn = function()
                 local n = #T.Entrants(t)
                 UI.Confirm(("Start %s with %d players?"):format(t.name, n), function() UI.Report(T:Start(t.id)) end)
             end }
         end
         local j = t.joins[me]
         if j and not j.out then
-            list[#list + 1] = { text = "Leave", width = 70, fn = function() UI.Report(T:Leave(t.id)) end }
+            list[#list + 1] = { text = "Leave", width = 70, tip = "Drop out. You can join again until it starts.",
+                fn = function() UI.Report(T:Leave(t.id)) end }
         else
-            list[#list + 1] = { text = "Join", width = 70, fn = function() UI.Report(T:Join(t.id)) end }
+            list[#list + 1] = { text = "Join", width = 70,
+                tip = "Sign up. When the host presses Start, the bracket is seeded by ladder rating.",
+                fn = function() UI.Report(T:Join(t.id)) end }
         end
     end
     return list
@@ -293,6 +301,7 @@ local function LayoutActions(list)
             button.fn = spec.fn
             button:SetText(spec.text)
             button:SetWidth(spec.width)
+            UI.SetTooltip(button, spec.text, spec.tip)
             button:ClearAllPoints()
             button:SetPoint("TOPRIGHT", -x, 0)
             button:Show()
@@ -349,10 +358,12 @@ local function RefreshSignup(t)
         local canBet = not item.waiting and not stake and (not T.IsIn(t, me) or item.key == me)
         row.button:SetShown(canBet or mine)
         row.button:SetText(mine and "Cancel" or "Bet")
+        UI.SetTooltip(row.button, mine and "Cancel" or "Bet", mine and "Take your bet back. You can until the host presses Start."
+            or ("Bet on %s to win the tournament. Betting closes when the host presses Start."):format(Short(item.key)))
     end)
     empty:SetShown(#items == 0)
     empty:SetText("Nobody has joined yet. Click Join to be the first.")
-    footer:SetText("The bracket is seeded by ladder rating when the host presses Start.")
+    footer:SetText("")
 end
 
 ------------------------------------------------------------------------
@@ -382,6 +393,7 @@ local function BoxEnter(self)
     local view = T.Pot(t, m.id)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine(UI.Name(m.a, true) .. "  vs  " .. UI.Name(m.b, true))
+    if m.need > 1 then GameTooltip:AddLine("Best of three", 0.6, 0.6, 0.6) end
     if m.winner then
         GameTooltip:AddLine(Short(m.winner) .. " won" .. (m.walkover and " (walkover)" or ""), 0.2, 1, 0.2)
     end
@@ -541,7 +553,7 @@ local function RefreshBracket(t)
     elseif status == "finished" then
         footer:SetText(("%s won the tournament."):format(Short(b.champion)))
     else
-        footer:SetText("Click a match to bet on it. The final is best of three.")
+        footer:SetText("")
     end
 end
 
@@ -551,7 +563,7 @@ end
 
 local BET_COLUMNS = {
     { key = "status", label = "Status", width = 62 },
-    { key = "what",   label = "",       width = 250 },
+    { key = "what",   label = "",       width = 240 },
     { key = "pot",    label = "Pot",    width = 196 },
     { key = "you",    label = "You",    width = 110 },
     { key = "action", label = "",       width = 84 },
@@ -566,6 +578,13 @@ local STATUS = {
     settled = "|cffff8000Unpaid|r",
     paid = "|cff20ff20Paid|r",
     void = "|cff888888Void|r",
+}
+
+local BET_TIPS = {
+    Bet = "Pick a side and an amount. Betting closes when they start dueling.",
+    Cancel = "Take your bet back. Betting closes when they start dueling.",
+    Pay = UI.PAY_TIP,
+    ["Got it"] = UI.GOT_IT_TIP,
 }
 
 local function BetAction(item)
@@ -634,12 +653,61 @@ local function RefreshBets(t)
         c.pot:SetText("|cffaaaaaa" .. item.pot .. "|r")
         c.you:SetText(item.you or "-")
         row.button:SetShown(item.action ~= nil)
-        if item.action then row.button:SetText(item.action) end
+        if item.action then
+            row.button:SetText(item.action)
+            UI.SetTooltip(row.button, item.action, BET_TIPS[item.action])
+        end
         row.selectedTex:SetShown(item.priority == 1)
     end)
     empty:SetShown(#items == 0)
     empty:SetText("No bets yet. Click a match in the bracket to bet on it.")
-    footer:SetText("Pay fills in a trade or mail for you; the winner clicks Got it once they have the gold.")
+    footer:SetText("")
+end
+
+------------------------------------------------------------------------
+-- Bracket / Bets switch
+------------------------------------------------------------------------
+
+local function ViewButton(content, label, which, tip)
+    local b = CreateFrame("Button", nil, content)
+    b:SetHeight(VIEWS_HEIGHT)
+    b.mode = which
+    b.label = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    b.label:SetPoint("CENTER", 0, 1)
+    b.label:SetText(label)
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints()
+    b.bg:SetColorTexture(1, 0.82, 0, 0.12)
+    b.underline = b:CreateTexture(nil, "ARTWORK")
+    b.underline:SetPoint("BOTTOMLEFT")
+    b.underline:SetPoint("BOTTOMRIGHT")
+    b.underline:SetHeight(2)
+    b.underline:SetColorTexture(1, 0.82, 0, 0.9)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.06)
+    b:SetScript("OnClick", function(self)
+        if mode == self.mode then return end
+        Compat.PlaySound("IG_CHARACTER_INFO_TAB")
+        mode = self.mode
+        UI:RefreshNow()
+    end)
+    UI.SetTooltip(b, label, tip)
+    return b
+end
+
+local function UpdateViews(t)
+    local pending = T.Pending(t)
+    views.bets.label:SetText(pending > 0 and ("Bets |cffff8000(%d)|r"):format(pending) or "Bets")
+    for _, b in ipairs({ views.bracket, views.bets }) do
+        local on = b.mode == mode
+        b.label:SetFontObject(on and "GameFontHighlight" or "GameFontNormal")
+        b:SetWidth(math.ceil(b.label:GetStringWidth()) + 28)
+        b.bg:SetShown(on)
+        b.underline:SetShown(on)
+        b:Show()
+    end
+    views.line:Show()
 end
 
 ------------------------------------------------------------------------
@@ -670,19 +738,27 @@ local function Build(content)
         actionButtons[i] = UI.Button(content, "", 80, function(self) if self.fn then self.fn(self) end end)
     end
 
-    local function Body()
+    views.bracket = ViewButton(content, "Bracket", "bracket", "Who plays whom. Click a match to bet on it.")
+    views.bracket:SetPoint("TOPLEFT", 0, -VIEWS_Y)
+    views.bets = ViewButton(content, "Bets", "bets", "Every pot in this tournament, what you have on it, and who pays whom.")
+    views.bets:SetPoint("LEFT", views.bracket, "RIGHT", 4, 0)
+    views.line = content:CreateTexture(nil, "ARTWORK")
+    views.line:SetColorTexture(1, 1, 1, 0.12)
+    views.line:SetHeight(1)
+    views.line:SetPoint("TOPLEFT", 0, -(VIEWS_Y + VIEWS_HEIGHT))
+    views.line:SetPoint("TOPRIGHT", 0, -(VIEWS_Y + VIEWS_HEIGHT))
+
+    local function Body(top)
         local f = CreateFrame("Frame", nil, content)
-        f:SetPoint("TOPLEFT", 0, -TOP)
+        f:SetPoint("TOPLEFT", 0, -top)
         f:SetPoint("BOTTOMRIGHT", 0, 24)
         return f
     end
-    signup = Body()
-    signupTable = UI.CreateTable(signup, SIGNUP_COLUMNS, SIGNUP_ROWS, {
-        rowHeight = 19, onScroll = function() UI:RequestRefresh() end,
-    })
+    signup = Body(TOP)
+    signupTable = UI.CreateTable(signup, SIGNUP_COLUMNS, SIGNUP_ROWS, { rowHeight = 19 })
     RowButton(signupTable, SignupAction)
 
-    bracket = Body()
+    bracket = Body(VIEWS_TOP)
     bracket.labels = {}
     for r = 1, 4 do
         local label = bracket:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -693,10 +769,8 @@ local function Build(content)
     champBox:SetScript("OnEnter", nil)
     champBox:SetScript("OnClick", nil)
 
-    betsView = Body()
-    betsTable = UI.CreateTable(betsView, BET_COLUMNS, BET_ROWS, {
-        rowHeight = 22, onScroll = function() UI:RequestRefresh() end,
-    })
+    betsView = Body(VIEWS_TOP)
+    betsTable = UI.CreateTable(betsView, BET_COLUMNS, BET_ROWS, { rowHeight = 22 })
     RowButton(betsTable, BetAction)
 
     empty = content:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -714,6 +788,9 @@ local function Refresh()
     bracket:Hide()
     betsView:Hide()
     empty:Hide()
+    views.bracket:Hide()
+    views.bets:Hide()
+    views.line:Hide()
 
     if not Data.guild then
         title:SetText("Tournament")
@@ -754,6 +831,7 @@ local function Refresh()
                 parts[#parts + 1] = ("|cffffd100your %s: vs %s|r"):format(T.RoundName(m.r, b.rounds):lower(), Short(opp))
             end
         end
+        UpdateViews(t)
         if mode == "bets" then
             betsView:Show()
             RefreshBets(t)
@@ -765,6 +843,6 @@ local function Refresh()
     sub:SetText(table.concat(parts, "  -  "))
 end
 
-UI:AddTab("Tournament", Build, Refresh)
+UI:AddTab("Tournament", Build, Refresh, function() return T:ActionCount() end)
 
 ns:On("TOURNEY_CHANGED", function() UI:RequestRefresh() end)

@@ -52,12 +52,12 @@ local function ChallengeClicked()
 end
 
 local function Build(content)
-    list = UI.CreateTable(content, { { key = "name", label = "Members with DuelLadder", width = 180 } }, LIST_ROWS, {
+    -- 172 + gap + scrollbar ends just left of the divider.
+    list = UI.CreateTable(content, { { key = "name", label = "Members with DuelLadder", width = 172 } }, LIST_ROWS, {
         onClick = function(key) -- the list's items are the member keys themselves
             selected = key
-            UI:RequestRefresh()
+            UI:RefreshNow()
         end,
-        onScroll = function() UI:RequestRefresh() end,
     })
 
     local divider = content:CreateTexture(nil, "ARTWORK")
@@ -118,6 +118,8 @@ local function Build(content)
     w.money:SetCopper(10 * 10000)
     local button = UI.Button(w.challenge, "Challenge", 90, ChallengeClicked)
     button:SetPoint("LEFT", w.money, "RIGHT", 6, 0)
+    UI.SetTooltip(button, "Challenge", "If they accept, they put in the same amount and the winner of your next duel "
+        .. "takes it all. You can cancel until the duel starts. Find it in the Bets tab.")
 end
 
 -- Everyone this member has a record against, members first, most duels first.

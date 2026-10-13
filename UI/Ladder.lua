@@ -30,7 +30,7 @@ local function SortBy(key)
         s.sortDesc = key ~= "name"
     end
     tbl.offset = 0
-    UI:RequestRefresh()
+    UI:RefreshNow()
 end
 
 -- Quick look when hovering a row.
@@ -58,19 +58,20 @@ local function Build(content)
         onHeaderClick = SortBy,
         onClick = function(item) UI:ShowProfile(item.key) end,
         onEnter = ShowTooltip,
-        onScroll = function() UI:RequestRefresh() end,
     })
 
     status = UI.CreateFooter(content, 30)
 
     guildOnlyBox = UI.CheckBox(content, "Guild duels only",
         function() return Data.settings.guildOnly end,
-        function(v) Data.settings.guildOnly = v end)
+        function(v) Data.settings.guildOnly = v end,
+        "Only count duels against members of your guild. Duels against anyone else don't change your stats.")
     guildOnlyBox:SetPoint("BOTTOMLEFT", 0, 2)
 
     announceBox = UI.CheckBox(content, "Announce my wins in guild chat",
         function() return Data.settings.announce end,
-        function(v) Data.settings.announce = v end)
+        function(v) Data.settings.announce = v end,
+        "Post a line in guild chat when you win a duel or take the crown.")
     announceBox:SetPoint("LEFT", guildOnlyBox.label, "RIGHT", 14, -1)
 
     local sync = UI.Button(content, "Sync", 80, function(self)
@@ -79,6 +80,7 @@ local function Build(content)
         C_Timer.After(15, function() self:Enable() end)
     end)
     sync:SetPoint("BOTTOMRIGHT", 0, 2)
+    UI.SetTooltip(sync, "Sync", "Ask the guild for fresh stats. This normally happens by itself.")
 end
 
 local function Refresh()
@@ -106,9 +108,7 @@ local function Refresh()
     end
 
     if Data.guild then
-        local shown = #list > 0
-            and ("%d-%d of %d"):format(tbl.offset + 1, math.min(#list, tbl.offset + ROWS), #list) or "0"
-        status:SetText(("Showing %s duelists.  %s = King of the Hill   |cffffd100*|r = your characters.  Scroll for more."):format(shown, UI.CROWN))
+        status:SetText(("%d duelists     %s King of the Hill     |cffffd100*|r Your characters"):format(#list, UI.CROWN))
     else
         status:SetText("You need to be in a guild to use DuelLadder.")
     end
