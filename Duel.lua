@@ -63,7 +63,7 @@ local function Feedback(ctx, e, h)
         local streak = e.streak > 1 and (" |cff20ff20%d wins in a row!|r"):format(e.streak) or ""
         ns.Print(("|cff20ff20Victory|r vs %s. Rating %s, %s.%s"):format(name, rating, record, streak))
         if Data.settings.announce then
-            SendChatMessage(("[DuelLadder] %s defeated %s (rating %d)"):format(
+            Compat.SendChatMessage(("[DuelLadder] %s defeated %s (rating %d)"):format(
                 UnitName("player"), Compat.ShortName(ctx.opp), e.rating), "GUILD")
         end
     elseif ctx.fled then
@@ -76,7 +76,7 @@ local function Feedback(ctx, e, h)
         ns.Print("|TInterface\\GroupFrame\\UI-Group-LeaderIcon:0|t |cffffd100You are the King of the Hill!|r Anyone who beats you takes the crown.")
         Compat.PlaySound("LEVEL_UP")
         if Data.settings.announce then
-            SendChatMessage(("[DuelLadder] %s is the new King of the Hill!"):format(UnitName("player")), "GUILD")
+            Compat.SendChatMessage(("[DuelLadder] %s is the new King of the Hill!"):format(UnitName("player")), "GUILD")
         end
     elseif ctx.lostCrown then
         ns.Print("You lost the crown.")
