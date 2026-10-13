@@ -86,7 +86,16 @@ b.run('UNITS.NPC = { "Carl", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANC
 b.run('UNITS.NPC = { "Anna", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANCE(1)')
 check(b.eval("TRADE_MONEY") == 100000, "Carl trades first, then Anna's trade opens: her gold is still filled in")
 
-# 13. Never accepts the trade for you
+# 13. The client's MoneyInputFrame_SetCopper throws on the trade box (TBC Anniversary): no error, gold still lands
+b.run('''TradeFrame:Hide(); UNITS.NPC = nil; TRADE_MONEY = 0; SET_TRADE_CALLS = 0
+OLD_SET_COPPER = MoneyInputFrame_SetCopper
+MoneyInputFrame_SetCopper = function() error("calling 'GetName' on bad self") end''')
+pay()
+b.run('UNITS.NPC = { "Anna", "" }; TradeFrame:Show(); FIRE("TRADE_SHOW"); ADVANCE(2)')
+check(b.eval("TRADE_MONEY") == 100000 and b.eval("SET_TRADE_CALLS") == 1, "a money box that throws falls back to setting the trade directly")
+b.run('MoneyInputFrame_SetCopper = OLD_SET_COPPER')
+
+# 14. Never accepts the trade for you
 check(b.eval("ACCEPTED") == 0 and a.eval("ACCEPTED") == 0, "the addon never clicks Trade")
 
 print(f"\n{failures} failure(s)")

@@ -14,7 +14,7 @@ Data.roster = {}
 Data.rosterComplete = false
 
 Data.START_RATING = 1500
-Data.RECENT_MAX = 10       -- duels kept per character for History and bets
+Data.RECENT_MAX = 10       -- duels kept per character for profiles and bets
 Data.PLACEMENT_GAMES = 5   -- duels before you get a real title
 
 local DEFAULTS = {
