@@ -57,10 +57,11 @@ jobs:
 
       - name: Package and publish
         if: steps.version.outputs.publish == 'true'
-        uses: BigWigsMods/packager@v2
         env:
-          # On a branch push the packager sees the tag we just made on HEAD and skips ("Found future
-          # tag"), expecting a separate tag-push run. Tags pushed with GITHUB_TOKEN never trigger one,
-          # so present this run as the tag run instead.
-          GITHUB_REF: refs/tags/${{ steps.version.outputs.tag }}
-          GITHUB_REF_NAME: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # Run the packager's script directly: the action skips on a branch push when a tag
+          # points at HEAD, and the runner resets GITHUB_REF for actions, so it can only be
+          # overridden in the shell.
+          curl -fsSL https://raw.githubusercontent.com/BigWigsMods/packager/v2/release.sh -o "$RUNNER_TEMP/release.sh"
+          GITHUB_REF="refs/tags/$TAG" GITHUB_REF_NAME="$TAG" bash "$RUNNER_TEMP/release.sh"
