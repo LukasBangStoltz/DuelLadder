@@ -35,7 +35,7 @@ LOCALIZED_CLASS_NAMES_MALE = { WARRIOR = "Warrior", MAGE = "Mage" }
 DUEL_WINNER_KNOCKOUT = "%1$s has defeated %2$s in a duel"
 DUEL_WINNER_RETREAT = "%2$s has fled from %1$s in a duel"
 SlashCmdList = {}
-Enum = { SendAddonMessageResult = { Success = 0, AddonMessageThrottle = 3, ChannelThrottle = 8 } }
+Enum = { SendAddonMessageResult = { Success = 0, AddonMessageThrottle = 3, ChannelThrottle = 8, AddOnMessageLockdown = 11 } }
 C_AddOns = { GetAddOnMetadata = function() return "0.1.0" end }
 function print(...) local t = {} for i = 1, select("#", ...) do t[#t+1] = tostring((select(i, ...))) end PRINTS[#PRINTS+1] = table.concat(t, " ") end
 function SendChatMessage(msg, ch) CHAT[#CHAT+1] = ch .. ": " .. msg end
