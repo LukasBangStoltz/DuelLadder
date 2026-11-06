@@ -1,8 +1,8 @@
 # DuelLadder
 
 A guild duel ladder for World of Warcraft: ratings, titles, King of the Hill, badges,
-head-to-head records and gold betting for every character in your guild. Built for
-**TBC Anniversary** (client 2.5.6), with **WoW Forever** in mind.
+head-to-head records and gold betting for every character in your guild. Works in
+**TBC Anniversary** (client 2.5.6), **WoW Forever** (client 1.60.1) and Retail.
 
 Every character is its own entry, so alts show up separately. Stats are shared with the
 guild over hidden addon messages, so everyone with the addon sees the same ladder, even
@@ -46,6 +46,7 @@ for members who are offline.
    or clone this repo.
 2. Put it in the AddOns folder of your client so you have `AddOns\DuelLadder\DuelLadder.toc`:
    - TBC Anniversary: `World of Warcraft\_anniversary_\Interface\AddOns`
+   - WoW Forever: `World of Warcraft\_forever_\Interface\AddOns`
    - Retail: `World of Warcraft\_retail_\Interface\AddOns`
 3. Restart the game (a `/reload` won't pick up new files).
 
@@ -74,8 +75,9 @@ Everyone in the guild should run the same version: sync formats change between v
 - Every client works out a tournament's bracket from the duel history the same way, so it
   keeps going when the host is offline. Duels that decide matches are copied into the
   tournament, since each character only keeps its last 10 duels.
-- Everything that differs between game clients lives in `Compat.lua`, to make porting to
-  WoW Forever easier. The addon never reads combat data.
+- Everything that differs between game clients lives in `Compat.lua`. The addon never reads
+  combat data. On Retail and Forever, addon messages are blocked in boss fights, Mythic+ and
+  rated PvP; sync waits and sends them once that lifts.
 
 ## Files
 
@@ -127,8 +129,8 @@ in `DuelLadder.toc` is new (`.github/workflows/release.yml`):
 **CurseForge:** the project ID is in `DuelLadder.toc` (`## X-Curse-Project-ID`), and the
 upload token is the repository secret `CF_API_TOKEN` (created under Author Settings → API
 Tokens on authors.curseforge.com). Every release is uploaded to CurseForge too.
-One zip works in every client: `## Interface: 20506, 120100` lists one version per client
-(TBC Anniversary, Retail), and the packager tags the CurseForge file with all of them. When a
+One zip works in every client: `## Interface: 20506, 120100, 16001` lists one version per
+client (TBC Anniversary, Retail, WoW Forever), and the packager tags the CurseForge file with all of them. When a
 client patches, update its number there.
 
 ## License

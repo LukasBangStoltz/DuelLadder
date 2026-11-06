@@ -3,7 +3,7 @@ import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILES = ["sim.py", "pools_check.py", "challenge_check.py", "trade_check.py", "badge_check.py", "tournament_check.py",
-         "tabs_check.py", "bet_safety_check.py"]
+         "tabs_check.py", "bet_safety_check.py", "forever_check.py"]
 
 total_pass, failed = 0, []
 for name in FILES:

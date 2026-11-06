@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- Every API call that can differ between clients (TBC Anniversary, Retail, and WoW Forever later)
+-- Every API call that can differ between clients (TBC Anniversary, Retail and WoW Forever)
 -- lives here. The rest of the addon only talks to Compat.
 local Compat = {}
 ns.Compat = Compat
@@ -12,7 +12,7 @@ Compat.Now = GetServerTime or time
 Compat.DUEL_KNOCKOUT = DUEL_WINNER_KNOCKOUT or "%1$s has defeated %2$s in a duel"
 Compat.DUEL_RETREAT = DUEL_WINNER_RETREAT or "%2$s has fled from %1$s in a duel"
 
--- Midnight-style clients (Forever) can hand addons "secret" values that can't be inspected.
+-- Midnight-style clients (Retail, Forever) can hand addons "secret" values that can't be inspected.
 function Compat.IsSecret(value)
     return issecretvalue ~= nil and issecretvalue(value) == true
 end
@@ -85,6 +85,7 @@ end
 function Compat.GetGuildRoster()
     local roster, count = {}, 0
     if not IsInGuild() then return roster, false end
+    if not GetGuildRosterInfo then return roster, false end
     local total = GetNumGuildMembers() or 0
     for i = 1, total do
         local name, _, _, level, _, _, _, _, online, _, classFile = GetGuildRosterInfo(i)
@@ -298,15 +299,24 @@ function Compat.RegisterPrefix(prefix)
     end
 end
 
--- Returns "ok", "throttled" or "failed". Older clients return a boolean,
+-- True while the client blocks addon messages (Retail and Forever do this in boss fights,
+-- Mythic+ and rated PvP). Messages sent then are refused, so wait until it lifts.
+function Compat.InMessagingLockdown()
+    return C_ChatInfo ~= nil and C_ChatInfo.InChatMessagingLockdown ~= nil
+        and C_ChatInfo.InChatMessagingLockdown() == true
+end
+
+-- Returns "ok", "throttled" (try again later) or "failed". Older clients return a boolean,
 -- newer ones an Enum.SendAddonMessageResult value.
 function Compat.SendAddonMessage(prefix, text, channel)
+    if Compat.InMessagingLockdown() then return "throttled" end
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     local result = send(prefix, text, channel)
     if result == nil or result == true or result == 0 then return "ok" end
     if result == false then return "throttled" end
     local enum = Enum and Enum.SendAddonMessageResult
-    if enum and (result == enum.AddonMessageThrottle or result == enum.ChannelThrottle) then
+    if enum and (result == enum.AddonMessageThrottle or result == enum.ChannelThrottle
+            or result == enum.AddOnMessageLockdown) then
         return "throttled"
     end
     return "failed"
